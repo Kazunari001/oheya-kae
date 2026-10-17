@@ -1,0 +1,34 @@
+name: 機能・改善提案
+description: oheya-kaeの機能追加、操作性やドキュメントの改善を提案します。
+title: "[提案] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい課題
+      description: どのような場面で困っているか、現在の操作と実現したいことを記載してください。
+      placeholder: 複数の配置案を比較するときに、... ができず困っています。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案する変更
+      description: 希望する操作や結果を記載してください。CLIのコマンド例、JSON例、画面のイメージがあれば添付できます。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 完了の判断基準
+      description: 何ができれば課題が解決したと判断できるか、具体例があれば記載してください。
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 検討した代替案・現在の回避策
+      description: 既存コマンドの組み合わせや別の方法を試していれば記載してください。
+  - type: textarea
+    id: context
+    attributes:
+      label: 補足・関連情報
+      description: 関連Issue、参考資料、既存の操作や保存データへの影響などがあれば記載してください。

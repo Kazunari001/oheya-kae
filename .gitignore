@@ -1,0 +1,8 @@
+node_modules/
+dist/
+output/
+oheya-kae.json
+# Keep projects created before the rename out of version control as well.
+*.lock.tmp
+*.write.tmp
+.env

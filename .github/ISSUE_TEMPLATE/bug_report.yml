@@ -1,0 +1,69 @@
+name: 不具合報告
+description: CLI・配置検証・画像取り込み・ビューアーなどの不具合を報告します。
+title: "[不具合] "
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 不具合の概要
+      description: どの操作で何が起きたか、利用への影響を記載してください。
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 発生箇所
+      multiple: true
+      options:
+        - CLI・プロジェクトの保存／読み込み
+        - 画像・解析JSONの取り込み
+        - 寸法補正・根拠管理
+        - 配置検証・配置案の生成
+        - HTML出力・3Dビューアー
+        - インストール・ビルド・テスト
+        - ドキュメント
+        - その他・不明
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 実行したコマンドや画面操作、必要な入力データを記載してください。再現条件が不明な場合は、その旨を記載してください。
+      placeholder: |
+        1. 新しいプロジェクトで部屋を作成する
+        2. 次のコマンドを実行する: ...
+        3. 出力HTMLを開いて ... を操作する
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する結果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の結果
+      description: エラーメッセージ、CLIのJSON出力・終了コード、スクリーンショットなどを添付できます。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 実行環境
+      description: 分かる範囲で記載してください。HTMLの閲覧だけの場合、Node.js・npmは不要です。
+      placeholder: |
+        - oheya-kaeのバージョン／コミット: node bin/oheya-kae.js --version または git rev-parse --short HEAD
+        - OS・バージョン:
+        - Node.js: node --version
+        - npm: npm --version
+        - シェル:
+        - ブラウザ・バージョン（表示の問題の場合）:
+        - 解析JSONの作成方法（呼び出し元AI・手入力など）:
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 補足・再現用データ
+      description: 最小限のプロジェクトJSONや解析JSON、回避策、関連Issueがあれば記載してください。APIキー・個人情報は除いてください。HTMLとプロジェクトJSONには元画像が埋め込まれるため、添付前に内容を確認してください。
