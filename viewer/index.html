@@ -29,14 +29,14 @@
           <div class="stat">
             <b id="area">—</b><small>床面積 m²</small>
           </div>
-          <div class="stat"><b id="count">0</b><small>家具</small></div>
+          <div class="stat"><b id="count">0</b><small>家具・小物</small></div>
         </div>
         <h2>LAYOUT / 配置案</h2>
         <select id="proposal" aria-label="配置案" class="proposal-select">
           <option value="current">現在の配置</option>
         </select>
         <div id="proposal-note" class="proposal-note"></div>
-        <h2>FURNITURE / 家具</h2>
+        <h2>OBJECTS / 家具・小物</h2>
         <div id="furniture-list"></div>
         <div id="detail" class="detail"></div>
         <h2>SOURCE IMAGES / 元画像</h2>
@@ -46,7 +46,7 @@
         <details>
           <summary>表示・検証について</summary>
           <p>
-            寸法:mm。編集はCLIで行いHTMLを再出力してください。寸法不足の家具は3D表示を省略します。天井高不明時は2400mmの仮表示。ドア検証は開口幅×必要奥行きの矩形領域で行い、扉の開閉軌跡・通路全体の連結性は検証しません。
+            寸法:mm。編集はCLIで行いHTMLを再出力してください。寸法・設置高さが不明な物体は3D表示を省略します。天井高不明時は2400mmの仮表示。支持面付きの棚と机は占有部を検証し、他の形状は外接箱で検証します。扉の開閉軌跡・通路全体の連結性は検証しません。
           </p>
           <p>
             Three.js — MIT License, Copyright © 2010–2025 three.js

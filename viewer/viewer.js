@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {openingGeometry, area} from '../src/geometry.js';
+import {resolveItems, solidParts} from '../src/scene.js';
 
 const payload = JSON.parse(
     document.getElementById('oheya-kae-data').textContent,
@@ -16,7 +17,7 @@ const STATUS_NAMES = {
   image: '画像記載',
   unknown: '不明',
 };
-let activeFurniture = project.furniture;
+let activeFurniture = resolveItems(project);
 let report = payload.validation;
 let selected = null;
 let mode = '3d';
@@ -63,11 +64,13 @@ function showDetail() {
   box.append(createElement('b', furniture.name));
   const detailList = createElement('dl');
   const fields = {
+    category: '意味上の種類',
     kind: '種類',
     width: '幅',
     depth: '奥行',
     height: '高さ',
     x: '位置 X',
+    y: '底面高さ Y',
     z: '位置 Z',
     rotation: '回転',
     color: '色',
@@ -79,7 +82,7 @@ function showDetail() {
         'dd',
         key === 'rotation'
           ? `${furniture[key]}°`
-          : ['kind', 'color'].includes(key)
+          : ['kind', 'category', 'color'].includes(key)
             ? furniture[key]
             : formatMillimeters(furniture[key]),
     );
@@ -97,6 +100,14 @@ function showDetail() {
       detailList,
       createElement('p', furniture.id, 'evidence'),
   );
+  if (furniture.parentId) {
+    box.append(createElement('p',
+        `支持関係: ${furniture.parentId} / ${furniture.attachment}`,
+        'evidence'));
+    box.append(createElement('p',
+        `親からの位置: ${furniture.local.x}, ${furniture.local.y ?? '不明'}, ` +
+        `${furniture.local.z} mm`, 'evidence'));
+  }
   for (const note of furniture.uncertainties) {
     box.append(createElement('p', note, 'evidence'));
   }
@@ -194,6 +205,7 @@ function sources() {
   const list = [
     ...(room?.images ?? []),
     ...project.furniture.flatMap((furniture) => furniture.images),
+    ...(project.objects ?? []).flatMap((item) => item.images),
   ];
   const seen = new Set();
   for (const source of list) {
@@ -284,7 +296,7 @@ function floorMaterial() {
   });
 }
 /**
- * Convert furniture from mm to meters and add its mesh, hit box and label.
+ * Convert furniture from mm to meters and add its mesh, pick targets and label.
  * Unknown dimensions omit the item from the 3D scene.
  * @param {!Object} furniture Normalized furniture with rotation in degrees.
  * @param {boolean} isInvalid Whether validation requires an error highlight.
@@ -294,20 +306,31 @@ function makeFurniture(furniture, isInvalid) {
   if (
     [furniture.width, furniture.depth, furniture.height].some(
         (v) => v == null,
-    )
+    ) || furniture.y == null
   ) {
     return;
   }
   const meshGroup = new THREE.Group();
   meshGroup.userData.furnitureId = furniture.id;
   group.add(meshGroup);
-  meshGroup.position.set(furniture.x / 1000, 0, furniture.z / 1000);
+  meshGroup.position.set(
+      furniture.x / 1000, furniture.y / 1000, furniture.z / 1000,
+  );
   meshGroup.rotation.y = (furniture.rotation * Math.PI) / 180;
   const w = furniture.width / 1000;
   const d = furniture.depth / 1000;
   const h = furniture.height / 1000;
   const col = isInvalid ? '#cb765c' : furniture.color;
-  if (['desk', 'table'].includes(furniture.kind)) {
+  const openShelf = furniture.kind === 'shelf' && furniture.supports.length > 0;
+  if (openShelf) {
+    for (const part of solidParts(furniture)) {
+      const mesh = box(meshGroup, part.width / 1000, part.height / 1000,
+          part.depth / 1000, part.x / 1000,
+          (part.y + part.height / 2) / 1000, part.z / 1000, col);
+      mesh.userData.id = furniture.id;
+      pickMeshes.push(mesh);
+    }
+  } else if (['desk', 'table'].includes(furniture.kind)) {
     const thick = Math.min(0.06, h / 5);
     box(meshGroup, w, thick, d, 0, h - thick / 2, 0, col);
     const leg = Math.min(0.045, w / 8, d / 8);
@@ -381,7 +404,7 @@ function makeFurniture(furniture, isInvalid) {
       }
     }
   }
-  // Invisible envelope gives a stable hit target and highlights actual bounds.
+  // Keep the full outline, but let clicks pass through an open shelf's gaps.
   const bounds = new THREE.BoxGeometry(w, h, d);
   const outline = new THREE.LineSegments(
       new THREE.EdgesGeometry(bounds),
@@ -398,14 +421,18 @@ function makeFurniture(furniture, isInvalid) {
   );
   outline.position.y = h / 2;
   meshGroup.add(outline);
-  const hit = new THREE.Mesh(
-      bounds,
-      new THREE.MeshBasicMaterial({visible: false}),
-  );
-  hit.position.y = h / 2;
-  hit.userData.id = furniture.id;
-  meshGroup.add(hit);
-  pickMeshes.push(hit);
+  if (openShelf) {
+    bounds.dispose();
+  } else {
+    const hit = new THREE.Mesh(
+        bounds,
+        new THREE.MeshBasicMaterial({visible: false}),
+    );
+    hit.position.y = h / 2;
+    hit.userData.id = furniture.id;
+    meshGroup.add(hit);
+    pickMeshes.push(hit);
+  }
   label(
       `${furniture.name}` +
       ' · ' +
@@ -413,7 +440,7 @@ function makeFurniture(furniture, isInvalid) {
       ' × ' +
       `${Math.round(furniture.depth)}`,
       furniture.x / 1000,
-      h + 0.12,
+      furniture.y / 1000 + h + 0.12,
       furniture.z / 1000,
       'furniture',
   );
@@ -801,7 +828,16 @@ function init() {
       return getElement('proposal').value;
     },
     get meshCount() {
-      return pickMeshes.length;
+      return new Set(pickMeshes.map((mesh) => mesh.userData.id)).size;
+    },
+    get worldPositions() {
+      return Object.fromEntries(group.children
+          .filter((item) => item.userData.furnitureId)
+          .map((item) => [item.userData.furnitureId, {
+            x: item.position.x * 1000, y: item.position.y * 1000,
+            z: item.position.z * 1000,
+            rotation: item.rotation.y * 180 / Math.PI,
+          }]));
     },
     get renderer() {
       return renderer;
@@ -852,7 +888,7 @@ getElement('proposal').addEventListener('change', () => {
   const proposal = payload.proposals.find(
       (v) => v.id === getElement('proposal').value,
   );
-  activeFurniture = proposal
+  const furniture = proposal
     ? project.furniture.map((furniture) => ({
       ...furniture,
       ...proposal.placements.find((v) => v.id === furniture.id),
@@ -870,6 +906,7 @@ getElement('proposal').addEventListener('change', () => {
       },
     }))
     : project.furniture;
+  activeFurniture = resolveItems({...project, furniture});
   report = proposal?.validation ?? payload.validation;
   getElement('proposal-note').textContent = proposal
     ? `${proposal.intent} ${proposal.notes.join(' ')}`

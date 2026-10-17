@@ -16,7 +16,7 @@ const packageMetadata = JSON.parse(
 const cli = new Command()
     .name('oheya-kae')
     .description(
-        'AI向けの部屋・家具レイアウトCLI。単位:mm、家具の位置:x,z中心座標。',
+        'AI向けの部屋・物体レイアウトCLI。単位:mm、位置:x,z中心と底面高さy。',
     )
     .version(packageMetadata.version);
 cli
@@ -81,6 +81,8 @@ const FURNITURE_FIELDS = [
   'x',
   'z',
   'rotation',
+  'y', 'category', 'sourceId', 'parentId', 'attachment', 'surfaceId',
+  'wall', 'supports', 'frameThickness',
 ];
 function geometryOptions(command) {
   return command
@@ -98,6 +100,13 @@ function furnitureOptions(command) {
       .option('--color <hex>', '#RRGGBB')
       .option('--x <mm>', 'Footprint center X', numeric)
       .option('--z <mm>', 'Footprint center Z', numeric)
+      .option('--y <mm>', 'Bottom elevation, relative to parent', numeric)
+      .option('--category <category>', 'Semantic object category')
+      .option('--source-id <id>', 'Source detection identifier')
+      .option('--parent-id <id>', 'Parent item or room identifier')
+      .option('--attachment <type>', 'floor|on|inside|wall|part')
+      .option('--surface-id <id>', 'Parent support surface identifier')
+      .option('--wall <index>', 'Room wall index for wall attachments', numeric)
       .option('--rotation <degrees>', 'Y-axis rotation', numeric);
 }
 function importOptions(command) {
@@ -129,20 +138,25 @@ async function importData(kind, options) {
     if (Object.hasOwn(data, kind)) {
       object(data[kind], `analysis.${kind}`);
     }
-    if (kind === 'room' && Object.hasOwn(data, 'furniture')) {
-      requireValue(
-          Array.isArray(data.furniture),
-          'analysis.furniture must be an array',
-      );
-      for (const item of data.furniture) {
-        object(item, 'analysis.furniture item');
+    if (kind === 'room') {
+      for (const field of ['furniture', 'objects']) {
+        if (Object.hasOwn(data, field)) {
+          requireValue(Array.isArray(data[field]),
+              `analysis.${field} must be an array`);
+          for (const item of data[field]) {
+            object(item, `analysis.${field} item`);
+          }
+        }
       }
     }
-    if (kind === 'furniture') {
+    if (kind !== 'room') {
       requireValue(
           !Object.hasOwn(data, 'room'),
-          'Expected furniture analysis, not room analysis',
+          `Expected ${kind} analysis, not room analysis`,
       );
+      const other = kind === 'object' ? 'furniture' : 'object';
+      requireValue(!Object.hasOwn(data, other),
+          `Expected ${kind} analysis, not ${other} analysis`);
     }
   }
   return {images, data};
@@ -208,11 +222,11 @@ cli
         'Return JSON schema and instructions for the ' +
         'calling AI to analyze images',
     )
-    .requiredOption('--kind <kind>', 'room|furniture')
+    .requiredOption('--kind <kind>', 'room|furniture|object')
     .action((options) => {
       requireValue(
-          ['room', 'furniture'].includes(options.kind),
-          'kind must be room or furniture',
+          ['room', 'furniture', 'object'].includes(options.kind),
+          'kind must be room, furniture or object',
       );
       result({
         schema: analysisSchema(options.kind),
@@ -282,6 +296,9 @@ importOptions(room.command('import'))
       const furniture = (data?.furniture ?? []).map((item) =>
         normalizeFurniture({...item, images}),
       );
+      const objects = (data?.objects ?? []).map((item) =>
+        normalizeFurniture({...item, images}),
+      );
       await changed((project) => {
         requireValue(
             !project.room || options.replace,
@@ -289,10 +306,12 @@ importOptions(room.command('import'))
         );
         project.room = currentRoom;
         project.furniture.push(...furniture);
+        project.objects.push(...objects);
         return {
           objectId: currentRoom.id,
           room: currentRoom,
           addedFurniture: furniture,
+          addedObjects: objects,
         };
       });
     });
@@ -392,6 +411,14 @@ room
     .action(async (options) =>
       changed((project) => {
         const currentRoom = needRoom(project);
+        if (options.includeFurniture) {
+          requireValue(
+              ![...project.furniture, ...project.objects].some((item) =>
+                item.parentId || item.supports.length,
+              ),
+              'Scaling supported scenes requires explicit geometry updates',
+          );
+        }
         requireValue(
             currentRoom.outline &&
             Number.isInteger(options.wall) &&
@@ -536,16 +563,19 @@ const furniture = cli
     .description('Create, import and edit furniture');
 furnitureOptions(furniture.command('add'))
     .option('--id <id>')
-    .action(async (options) =>
-      changed((project) => {
-        const item = normalizeFurniture(options, {
+    .option('--data <json>', 'Attributes including support surfaces')
+    .action(async (options) => {
+      const data = options.data ? await readJSON(options.data) : {};
+      object(data, 'furniture data');
+      await changed((project) => {
+        const item = normalizeFurniture({...data, ...options}, {
           trusted: true,
           fallback: 'confirmed',
         });
         project.furniture.push(item);
         return {objectId: item.id, furniture: item};
-      }),
-    );
+      });
+    });
 importOptions(furniture.command('import')).action(
     async (options) => {
       const {images, data} = await importData('furniture', options);
@@ -571,7 +601,8 @@ furnitureOptions(furniture.command('update'))
       validatePatch(
           patch,
           ['id', ...FURNITURE_FIELDS, 'uncertainties'],
-          ['width', 'depth', 'height'],
+          ['width', 'depth', 'height', 'y', 'parentId', 'surfaceId',
+            'wall', 'sourceId'],
       );
       Object.assign(patch, selected(options, FURNITURE_FIELDS));
       await changed((project) => {
@@ -599,15 +630,16 @@ furniture
     .command('move')
     .requiredOption('--id <id>')
     .option('--x <mm>', 'Center X', numeric)
+    .option('--y <mm>', 'Bottom elevation', numeric)
     .option('--z <mm>', 'Center Z', numeric)
     .option('--rotation <degrees>', 'Y rotation', numeric)
     .action(async (options) =>
       changed((project) => {
         const item = needFurniture(project, options.id);
-        const patch = selected(options, ['x', 'z', 'rotation']);
+        const patch = selected(options, ['x', 'y', 'z', 'rotation']);
         requireValue(
             Object.keys(patch).length,
-            'Specify x, z or rotation',
+            'Specify x, y, z or rotation',
         );
         Object.assign(item, patch);
         confirmed(item, Object.keys(patch));
@@ -622,6 +654,13 @@ furniture
     .action(async (options) =>
       changed((project) => {
         const item = needFurniture(project, options.id);
+        requireValue(
+            !item.supports.length &&
+            ![...project.furniture, ...project.objects].some((child) =>
+              child.parentId === item.id,
+            ),
+            'Scaling a support requires explicit surface and child updates',
+        );
         requireValue(
             ['width', 'depth', 'height'].includes(options.dimension) &&
             item[options.dimension] != null,
@@ -654,6 +693,64 @@ furniture
         return {objectId: options.id, removed: true};
       }),
     );
+
+const objects = cli.command('object')
+    .description('Manage supported small items');
+furnitureOptions(objects.command('add'))
+    .option('--id <id>')
+    .option('--data <json>', 'Object attributes and support relationship')
+    .action(async (options) => {
+      const data = options.data ? await readJSON(options.data) : {};
+      object(data, 'object data');
+      await changed((project) => {
+        const item = normalizeFurniture({...data, ...options}, {
+          trusted: true, fallback: 'confirmed',
+        });
+        project.objects.push(item);
+        return {objectId: item.id, object: item};
+      });
+    });
+importOptions(objects.command('import')).action(async (options) => {
+  const {images, data} = await importData('object', options);
+  const item = normalizeFurniture({...data?.object ?? data ?? {}, images});
+  await changed((project) => {
+    project.objects.push(item);
+    return {objectId: item.id, object: item};
+  });
+});
+furnitureOptions(objects.command('update'))
+    .requiredOption('--id <id>')
+    .option('--data <json>', 'Partial object attributes')
+    .option('--confirm <field>', 'Mark checked field', repeat, [])
+    .action(async (options) => {
+      const patch = options.data ? await readJSON(options.data) : {};
+      validatePatch(patch, [...FURNITURE_FIELDS, 'uncertainties'],
+          ['width', 'depth', 'height', 'y', 'parentId', 'surfaceId',
+            'wall', 'sourceId']);
+      Object.assign(patch, selected(options, FURNITURE_FIELDS));
+      await changed((project) => {
+        const index = project.objects.findIndex(
+            (item) => item.id === options.id,
+        );
+        requireValue(index >= 0, `Object not found: ${options.id}`);
+        const next = normalizeFurniture({...project.objects[index], ...patch},
+            {trusted: true});
+        confirmed(next, Object.keys(patch).filter((key) =>
+          FURNITURE_FIELDS.includes(key),
+        ));
+        explicitConfirm(next, options.confirm);
+        project.objects[index] = next;
+        return {objectId: next.id, object: next};
+      });
+    });
+objects.command('remove')
+    .requiredOption('--id <id>')
+    .action(async (options) => changed((project) => {
+      const index = project.objects.findIndex((item) => item.id === options.id);
+      requireValue(index >= 0, `Object not found: ${options.id}`);
+      project.objects.splice(index, 1);
+      return {objectId: options.id, removed: true};
+    }));
 
 const layout = cli
     .command('layout')

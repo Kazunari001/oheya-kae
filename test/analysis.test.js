@@ -25,6 +25,10 @@ test(
           room.properties.room.properties.outline.type.includes('null'),
       );
       assert.equal(room.properties.furniture.type, 'array');
+      assert.equal(room.properties.objects.type, 'array');
+      assert.equal(room.properties.objects.items.properties.y.type
+          .includes('null'), true);
+      assert.ok(room.properties.furniture.items.properties.supports);
       for (const schema of [
         room.properties.furniture.items,
         furniture.properties.furniture,

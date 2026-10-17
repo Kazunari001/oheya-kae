@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {requireValue} from './errors.js';
-import {simplePolygon, openingGeometry} from './geometry.js';
+import {simplePolygon, openingGeometry, footprint, contained} from './geometry.js';
+import {resolveItems} from './scene.js';
 
 export const STATUSES = [
   'estimated',
@@ -18,6 +19,7 @@ export const KINDS = [
   'shelf',
   'cabinet',
 ];
+export const ATTACHMENTS = ['floor', 'on', 'inside', 'wall', 'part'];
 /**
  * Generate a prefixed identifier for a newly created model object.
  * @param {string} prefix Object kind, such as room or furniture.
@@ -27,13 +29,14 @@ export const id = (prefix) =>
   `${prefix}-${randomUUID().slice(0, 8)}`;
 /**
  * Create a fresh editable project with no known room geometry.
- * @return {!Object} Version 1 project using millimeters.
+ * @return {!Object} Version 2 project using millimeters.
  */
 export const emptyProject = () => ({
-  version: 1,
+  version: 2,
   units: 'mm',
   room: null,
   furniture: [],
+  objects: [],
   proposals: [],
 });
 /**
@@ -110,6 +113,37 @@ function images(value = []) {
     return {name: string(i.name, 'image name'), data: i.data};
   });
 }
+
+function supportSurfaces(value, furniture) {
+  requireValue(Array.isArray(value), 'supports must be an array');
+  const ids = new Set();
+  return value.map((raw) => {
+    object(raw, 'support surface');
+    const surface = {
+      id: identifier(raw.id),
+      x: number(raw.x ?? 0, 'surface x'),
+      z: number(raw.z ?? 0, 'surface z'),
+      y: number(raw.y, 'surface top y', 0, 1e6),
+      width: dimension(raw.width, 'surface width'),
+      depth: dimension(raw.depth, 'surface depth'),
+      thickness: number(raw.thickness ?? 20, 'surface thickness', 1, 1e6),
+    };
+    requireValue(!ids.has(surface.id), 'Duplicate support surface ID');
+    ids.add(surface.id);
+    requireValue(
+        surface.width != null && surface.depth != null &&
+        surface.y >= surface.thickness &&
+        furniture.width != null && furniture.depth != null &&
+        furniture.height != null && surface.y <= furniture.height &&
+        contained(
+            footprint({...surface, rotation: 0}),
+            footprint({...furniture, x: 0, z: 0, rotation: 0}),
+        ),
+        'Support surfaces must fit inside known parent dimensions',
+    );
+    return surface;
+  });
+}
 /**
  * Attach provenance while preventing imported data from claiming confirmation.
  * @param {!Object} fields Field values to describe.
@@ -175,9 +209,42 @@ export function normalizeFurniture(
     x: number(raw.x ?? 0, 'x'),
     z: number(raw.z ?? 0, 'z'),
     rotation: number(raw.rotation ?? 0, 'rotation') % 360,
+    category: string(raw.category ?? raw.kind ?? 'box', 'category'),
+    sourceId: raw.sourceId == null ? null : string(raw.sourceId, 'sourceId'),
+    parentId: raw.parentId == null ? null : identifier(raw.parentId),
+    attachment: raw.attachment ?? (raw.parentId ? 'on' : 'floor'),
+    surfaceId: raw.surfaceId == null ? null : identifier(raw.surfaceId),
+    wall: raw.wall == null ? null : number(raw.wall, 'wall', 0, 199),
+    y: raw.y === undefined
+      ? (raw.parentId ? null : 0)
+      : (raw.y === null ? null : number(raw.y, 'y')),
+    frameThickness: number(raw.frameThickness ?? 20, 'frameThickness', 1, 1e6),
     images: images(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
+  requireValue(
+      ATTACHMENTS.includes(furniture.attachment),
+      'Unsupported attachment',
+  );
+  requireValue(
+      furniture.attachment === 'floor'
+        ? furniture.parentId == null
+        : furniture.parentId != null,
+      'Non-floor attachments require a parent; floor items have no parent',
+  );
+  requireValue(
+      furniture.wall == null || Number.isInteger(furniture.wall),
+      'wall must be an integer',
+  );
+  furniture.supports = supportSurfaces(
+      raw.supports === undefined ? [] : raw.supports, furniture,
+  );
+  if (furniture.kind === 'shelf' && furniture.supports.length) {
+    requireValue(
+        furniture.frameThickness <= Math.min(furniture.width, furniture.depth),
+        'Shelf frame must fit inside its dimensions',
+    );
+  }
   requireValue(
       KINDS.includes(furniture.kind),
       `kind must be one of ${KINDS.join(', ')}`,
@@ -205,6 +272,21 @@ export function normalizeFurniture(
       fallback,
       trusted,
   );
+  const spatialKeys = [
+    'category', 'sourceId', 'parentId', 'attachment', 'surfaceId',
+    'wall', 'y', 'supports', 'frameThickness',
+  ].filter((key) =>
+    (!['sourceId', 'parentId', 'surfaceId', 'wall'].includes(key) ||
+        furniture[key] != null) &&
+        ((key === 'y' && furniture.y === null) ||
+            Object.hasOwn(raw.evidence ?? {}, key) ||
+            ((!trusted || raw.evidence === undefined) &&
+                Object.hasOwn(raw, key))),
+  );
+  Object.assign(furniture.evidence, evidenceFor(
+      Object.fromEntries(spatialKeys.map((key) => [key, furniture[key]])),
+      raw.evidence, fallback, trusted,
+  ));
   for (const key of ['x', 'z', 'rotation']) {
     if (raw[key] == null) {
       furniture.evidence[key] = {
@@ -379,23 +461,34 @@ export function normalizeRoom(
 }
 /**
  * Validate saved state, preserving trusted evidence and proposal references.
- * @param {!Object} raw Version 1 project using millimeters.
+ * @param {!Object} raw Version 1 or 2 project using millimeters.
  * @return {!Object} Normalized state with unique object and proposal IDs.
  * @throws {AppError} If the state or any proposal reference is invalid.
  */
 export function normalizeProject(raw) {
   object(raw, 'project');
   requireValue(
-      raw.version === 1 && raw.units === 'mm',
+      [1, 2].includes(raw.version) && raw.units === 'mm',
       'Unsupported project version or units',
   );
   requireValue(
       Array.isArray(raw.furniture) &&
-      Array.isArray(raw.proposals ?? []),
-      'furniture/proposals must be arrays',
+      Array.isArray(raw.proposals ?? []) &&
+      (raw.objects === undefined || Array.isArray(raw.objects)),
+      'furniture/objects/proposals must be arrays',
+  );
+  requireValue(
+      raw.version === 2 ||
+      (!(raw.objects?.length) && raw.furniture.every((item) => {
+        object(item, 'furniture');
+        return ['parentId', 'y', 'supports', 'attachment'].every((key) =>
+          !Object.hasOwn(item, key),
+        );
+      })),
+      'Spatial data requires project version 2',
   );
   const project = {
-    version: 1,
+    version: 2,
     units: 'mm',
     room:
       raw.room == null
@@ -404,6 +497,9 @@ export function normalizeProject(raw) {
     furniture: raw.furniture.map((furniture) =>
       normalizeFurniture(furniture, {trusted: true}),
     ),
+    objects: (raw.objects ?? []).map((item) =>
+      normalizeFurniture(item, {trusted: true}),
+    ),
     proposals: [],
   };
   requireValue(
@@ -411,6 +507,7 @@ export function normalizeProject(raw) {
           .size === project.furniture.length,
       'Duplicate furniture IDs',
   );
+  validateRelationships(project);
   project.proposals = (raw.proposals ?? []).map((value) => {
     object(value, 'proposal');
     requireValue(
@@ -452,6 +549,56 @@ export function normalizeProject(raw) {
       'Duplicate proposal IDs',
   );
   return project;
+}
+
+/**
+ * Validate global IDs and support references before saving a scene.
+ * @param {!Object} project Normalized project with local coordinates in mm.
+ * @return {void}
+ */
+function validateRelationships(project) {
+  const items = [...project.furniture, ...project.objects];
+  const ids = items.map((item) => item.id);
+  if (project.room) {
+    ids.push(project.room.id, ...project.room.openings.map((item) => item.id));
+  }
+  requireValue(new Set(ids).size === ids.length, 'Duplicate scene IDs');
+  const lookup = new Map(items.map((item) => [item.id, item]));
+  for (const item of items) {
+    if (item.attachment === 'floor') {
+      requireValue(item.surfaceId == null && item.wall == null,
+          'Floor items cannot name a surface or wall');
+      continue;
+    }
+    if (item.attachment === 'wall') {
+      requireValue(
+          item.parentId === project.room?.id && item.wall != null &&
+          project.room.outline && item.wall < project.room.outline.length &&
+          item.surfaceId == null,
+          'Wall attachments require a room parent and valid wall',
+      );
+    } else {
+      const parent = lookup.get(item.parentId);
+      requireValue(parent, `Missing parent: ${item.parentId}`);
+      requireValue(item.wall == null, 'Only wall attachments name a wall');
+      if (item.surfaceId != null) {
+        requireValue(parent.supports.some((s) => s.id === item.surfaceId),
+            `Missing support surface: ${item.surfaceId}`);
+      }
+      requireValue(item.attachment !== 'inside' || item.surfaceId != null,
+          'Inside attachments require an explicit support surface');
+      requireValue(
+          !['on', 'inside'].includes(item.attachment) ||
+          !parent.supports.length || item.surfaceId != null,
+          'A parent with support surfaces requires a surfaceId',
+      );
+    }
+  }
+  try {
+    resolveItems(project);
+  } catch (error) {
+    requireValue(false, error.message);
+  }
 }
 /**
  * Collect fields and uncertainties that still need human confirmation.
@@ -497,6 +644,9 @@ export function corrections(project) {
   for (const furniture of project.furniture) {
     scan(furniture, `furniture.${furniture.id}`);
   }
+  for (const item of project.objects ?? []) {
+    scan(item, `objects.${item.id}`);
+  }
   return result;
 }
 /**
@@ -507,6 +657,11 @@ export function corrections(project) {
  */
 export function confirmed(item, keys) {
   for (const key of keys) {
+    if (['parentId', 'surfaceId', 'wall', 'sourceId'].includes(key) &&
+        item[key] == null) {
+      delete item.evidence[key];
+      continue;
+    }
     item.evidence[key] = {
       status: item[key] == null ? 'unknown' : 'confirmed',
       note: 'CLIで入力・確認済み。',

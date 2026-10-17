@@ -23,6 +23,13 @@ export function propose(
       clearance = 400,
     } = {},
 ) {
+  if (project.furniture.some((item) => item.parentId || item.y)) {
+    throw new AppError(
+        'UNSUPPORTED_LAYOUT',
+        'Proposals currently require floor-level root furniture; ' +
+        'attached objects follow their parents automatically.',
+    );
+  }
   if (
     !project.room?.outline ||
     project.furniture.some((furniture) =>
