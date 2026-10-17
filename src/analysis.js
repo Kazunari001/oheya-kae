@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {AppError, requireValue} from './errors.js';
-import {KINDS} from './model.js';
+import {KINDS, ATTACHMENTS} from './model.js';
 
 /**
  * Load 1–12 local images as data URLs without network access.
@@ -115,6 +115,29 @@ const FURNITURE_SCHEMA = objectSchema({
     'rotation',
   ]),
 });
+const SPATIAL_PROPERTIES = {
+  id: STRING_SCHEMA,
+  category: STRING_SCHEMA,
+  sourceId: {type: ['string', 'null']},
+  parentId: {type: ['string', 'null']},
+  attachment: {type: 'string', enum: ATTACHMENTS},
+  surfaceId: {type: ['string', 'null']},
+  wall: {type: ['integer', 'null']},
+  y: NULLABLE_NUMBER_SCHEMA,
+  frameThickness: NUMBER_SCHEMA,
+  supports: arraySchema(objectSchema({
+    id: STRING_SCHEMA, x: NUMBER_SCHEMA, z: NUMBER_SCHEMA,
+    y: NUMBER_SCHEMA, width: NUMBER_SCHEMA, depth: NUMBER_SCHEMA,
+    thickness: NUMBER_SCHEMA,
+  })),
+};
+Object.assign(FURNITURE_SCHEMA.properties, SPATIAL_PROPERTIES);
+const spatialEvidenceKeys = Object.keys(SPATIAL_PROPERTIES)
+    .filter((key) => key !== 'id');
+for (const key of spatialEvidenceKeys) {
+  FURNITURE_SCHEMA.properties.evidence.properties[key] =
+    evidenceSchema([key]).properties[key];
+}
 const OPENING_SCHEMA = objectSchema({
   type: {type: 'string', enum: ['door', 'window']},
   wall: {type: 'integer'},
@@ -156,26 +179,33 @@ const ROOM_SCHEMA = objectSchema({
 });
 /**
  * Build the caller-facing analysis schema; geometric lengths are in mm.
- * @param {string} kind Requested kind: room or furniture.
+ * @param {string} kind Requested kind: room, furniture or object.
  * @return {!Object} JSON Schema with nullable unknown measurements.
  */
 export function analysisSchema(kind) {
-  return kind === 'room'
-    ? objectSchema({
+  if (kind === 'room') {
+    const schema = objectSchema({
       room: ROOM_SCHEMA,
       furniture: arraySchema(FURNITURE_SCHEMA),
-    })
-    : objectSchema({furniture: FURNITURE_SCHEMA});
+    });
+    schema.properties.objects = arraySchema(FURNITURE_SCHEMA);
+    schema.properties.room.properties.id = STRING_SCHEMA;
+    return schema;
+  }
+  return objectSchema({[kind]: FURNITURE_SCHEMA});
 }
 /**
  * Describe the analysis contract for the caller AI, including uncertainty.
- * @param {string} kind Requested kind: room or furniture.
+ * @param {string} kind Requested kind: room, furniture or object.
  * @return {string} Instructions consistent with analysisSchema().
  */
 export function analysisPrompt(kind) {
+  const subject = kind === 'room'
+    ? 'single room'
+    : kind === 'object' ? 'object' : 'furniture item';
   return (
     'Analyze the supplied images of the SAME ' +
-    `${kind === 'room' ? 'single room' : 'furniture item'}` +
+    subject +
     '. Return JSON matching the schema. All lengths in ' +
     'millimeters. Floor coordinates are [x,z]. Room ' +
     'outline is a simple polygon; wall indices refer to ' +
@@ -191,7 +221,14 @@ export function analysisPrompt(kind) {
     'guesses. Use null for unresolvable ' +
     'dimensions/outline/positions; never invent a ' +
     'reliable scale from pixels without a known ' +
-    'reference. If shape is visible but scale unknown, ' +
+    'reference. Optional objects holds small items. ' +
+    'Assign stable ids. parentId references a furniture/object id ' +
+    'or the room id for wall attachments. Child x,y,z and rotation ' +
+    'are local to the parent; y is the bottom elevation, not height. ' +
+    'Use attachment floor/on/inside/wall/part; inside requires ' +
+    'surfaceId. supports defines local board top y, width, depth, ' +
+    'x,z and thickness. Preserve semantic category and sourceId. ' +
+    'If shape is visible but scale unknown, ' +
     'leave outline null and describe relative geometry ' +
     'in uncertainties. Describe occluded walls, unseen ' +
     'openings, hidden furniture parts and ambiguities ' +

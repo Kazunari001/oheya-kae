@@ -2,8 +2,11 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {load} from '../src/store.js';
+import {normalizeProject} from '../src/model.js';
 import {exportHTML} from '../src/export.js';
+import * as THREE from 'three';
 
 // Google Chrome is the only supported browser on every platform.
 const browser = await chromium.launch({
@@ -203,10 +206,73 @@ try {
   );
   assert.deepEqual(network, []);
   assert.deepEqual(errors, []);
+  const spatial = normalizeProject(JSON.parse(await readFile(
+      'test/fixtures/spatial-room.json', 'utf8',
+  )));
+  spatial.objects.find((item) => item.id === 'books').x = 100;
+  await exportHTML(spatial, 'output/spatial-demo.html');
+  await page.setViewportSize({width: 1440, height: 980});
+  const spatialUrl = (name) =>
+    pathToFileURL(path.resolve(`output/${name}`)).href;
+  await page.goto(spatialUrl('spatial-demo.html'));
+  await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 8);
+  let positions = await page.evaluate(
+      () => window.oheyaKaeViewer.worldPositions,
+  );
+  assert.equal(positions.books.y, 100);
+  assert.equal(positions.oven.y, 900);
+  assert.equal(positions.tv.y, 400);
+  assert.equal(positions.clock.y, 1500);
+  await page.getByRole('button', {name: '下段の本', exact: false}).click();
+  assert.match(await page.locator('#detail').innerText(), /支持関係: shelf/);
+  // Project known fixture points using the reset perspective camera, then use
+  // real pointer events so this covers picking rather than sidebar selection.
+  const clickSpatialPoint = async (point, expectedId) => {
+    const bounds = await page.locator('canvas').boundingBox();
+    const camera = new THREE.PerspectiveCamera(
+        42, bounds.width / bounds.height, 0.01, 500,
+    );
+    camera.position.fromArray(await page.evaluate(
+        () => window.oheyaKaeViewer.cameraPosition,
+    ));
+    camera.lookAt(2, 0, 2.5);
+    camera.updateMatrixWorld(true);
+    const projected = new THREE.Vector3(...point).project(camera);
+    await page.mouse.click(
+        bounds.x + (projected.x + 1) * bounds.width / 2,
+        bounds.y + (1 - projected.y) * bounds.height / 2,
+    );
+    assert.equal(
+        await page.evaluate(() => window.oheyaKaeViewer.selected),
+        expectedId,
+    );
+  };
+  await clickSpatialPoint([0.9, 0.25, 0.9], 'books');
+  await clickSpatialPoint([0.9, 1.1, 1], 'oven');
+  await clickSpatialPoint([1.1, 0.89, 1.4], 'shelf');
+  await clickSpatialPoint([1.14, 0.6, 1.59], 'shelf');
+  await clickSpatialPoint([0.9, 0.6, 1], null);
+  await page.screenshot({path: 'output/spatial-demo.png', fullPage: true});
+  const shelf = spatial.furniture.find((item) => item.id === 'shelf');
+  Object.assign(shelf, {x: 1400, z: 1500, rotation: 180});
+  await exportHTML(spatial, 'output/spatial-moved.html');
+  await page.goto(spatialUrl('spatial-moved.html'));
+  await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 8);
+  positions = await page.evaluate(() => window.oheyaKaeViewer.worldPositions);
+  assert.equal(positions.books.x, 1300);
+  assert.equal(positions.books.z, 1500);
+  assert.equal(positions.books.rotation, 180);
+  assert.equal(positions.books.y, 100);
+  shelf.y = null;
+  await exportHTML(spatial, 'output/spatial-unknown.html');
+  await page.goto(spatialUrl('spatial-unknown.html'));
+  await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 5);
+  assert.deepEqual(network, []);
+  assert.deepEqual(errors, []);
   console.log(
       'Browser checks passed: file://, offline, 3D, ' +
       'selection, orbit, top view, dimensions, proposal ' +
-      'comparison, mobile.',
+      'comparison, mobile, support surfaces, elevated objects, parent moves.',
   );
 } finally {
   await browser.close();
