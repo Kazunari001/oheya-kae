@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1">
+    <title>oheya-kae — Layout Studio</title>
+    <link rel="stylesheet" href="./viewer.css">
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="mark" aria-hidden="true">⌑</div>
+        <div>
+          <strong>oheya-kae</strong><small>LAYOUT STUDIO</small>
+        </div>
+      </div>
+      <span class="tag"
+        >YOUR SPACE, WOVEN TOGETHER · OFFLINE VIEWER</span
+      >
+    </header>
+    <div class="shell">
+      <aside>
+        <div class="eyebrow">ROOM / 01</div>
+        <h1 id="room-name">部屋</h1>
+        <div id="room-summary" class="room-summary"></div>
+        <div class="stat-grid">
+          <div class="stat">
+            <b id="area">—</b><small>床面積 m²</small>
+          </div>
+          <div class="stat"><b id="count">0</b><small>家具</small></div>
+        </div>
+        <h2>LAYOUT / 配置案</h2>
+        <select id="proposal" aria-label="配置案" class="proposal-select">
+          <option value="current">現在の配置</option>
+        </select>
+        <div id="proposal-note" class="proposal-note"></div>
+        <h2>FURNITURE / 家具</h2>
+        <div id="furniture-list"></div>
+        <div id="detail" class="detail"></div>
+        <h2>SOURCE IMAGES / 元画像</h2>
+        <div id="sources" class="sources"></div>
+        <h2>TO CONFIRM / 補正・確認</h2>
+        <ul id="corrections" class="corrections"></ul>
+        <details>
+          <summary>表示・検証について</summary>
+          <p>
+            寸法:mm。編集はCLIで行いHTMLを再出力してください。寸法不足の家具は3D表示を省略します。天井高不明時は2400mmの仮表示。ドア検証は開口幅×必要奥行きの矩形領域で行い、扉の開閉軌跡・通路全体の連結性は検証しません。
+          </p>
+          <p>
+            Three.js — MIT License, Copyright © 2010–2025 three.js
+            authors. Permission is hereby granted, free of charge, to
+            any person obtaining a copy of this software and associated
+            documentation files, to deal in the Software without
+            restriction, including without limitation the rights to use,
+            copy, modify, merge, publish, distribute, sublicense, and/or
+            sell copies of the Software, and to permit persons to whom
+            the Software is furnished to do so, subject to inclusion of
+            this notice. THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT
+            WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+            LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+            PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+            THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+            DAMAGES OR OTHER LIABILITY.
+          </p>
+        </details>
+      </aside>
+      <main>
+        <div id="viewport" class="viewport"></div>
+        <div id="labels" class="labels"></div>
+        <div class="toolbar">
+          <div class="pills">
+            <button id="view-3d" class="active" aria-pressed="true">
+              3Dビュー</button
+            ><button id="view-top" aria-pressed="false">間取り</button>
+          </div>
+          <div class="tool-options">
+            <button id="dimensions" aria-pressed="true">寸法</button
+            ><button id="walls" aria-pressed="true">壁</button
+            ><button id="reset">視点を戻す</button>
+          </div>
+        </div>
+        <div id="status" class="status" role="status"></div>
+        <div class="bottom-bar">
+          <div class="hint">
+            ドラッグで回転 · ホイールで拡大 · 右ドラッグで移動
+          </div>
+          <div id="validation" class="validation" role="status"></div>
+        </div>
+      </main>
+    </div>
+    <script id="oheya-kae-data" type="application/json">
+      /*OHEYA_KAE_DATA*/
+    </script>
+    <script>
+      /*OHEYA_KAE_SCRIPT*/
+    </script>
+  </body>
+</html>
