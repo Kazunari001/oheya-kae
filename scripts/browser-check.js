@@ -188,7 +188,8 @@ try {
   ];
   withImages.room.name =
     'Room $& $\' $` $$ /*OHEYA_KAE_SCRIPT*/ ' +
-    '/*OHEYA_KAE_DATA*/ </script>';
+    '/*OHEYA_KAE_DATA*/ </ScRiPt ignored>' +
+    '<SCRIPT>window.sourceInjection = true</SCRIPT>';
   await exportHTML(withImages, 'output/browser-images.html');
   await page.goto(
       pathToFileURL(path.resolve('output/browser-images.html')).href,
@@ -204,11 +205,82 @@ try {
       await page.locator('#room-name').textContent(),
       withImages.room.name,
   );
+  assert.equal(await page.locator('script').count(), 2);
+  const viewerScript = await page.locator('script').nth(1).textContent();
+  assert.ok(viewerScript.includes('WebGLRenderer'));
+  assert.ok(!viewerScript.includes('/*OHEYA_KAE_SCRIPT*/'));
+  assert.equal(await page.evaluate(() => window.sourceInjection), undefined);
   assert.deepEqual(network, []);
   assert.deepEqual(errors, []);
   const spatial = normalizeProject(JSON.parse(await readFile(
       'test/fixtures/spatial-room.json', 'utf8',
   )));
+  const imageProject = structuredClone(spatial);
+  const validImages = [
+    withImages.room.images[0],
+    ...await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      return ['jpeg', 'webp'].map((type) => ({
+        name: `<img src=x onerror="window.sourceInjection=true">.${type}`,
+        data: canvas.toDataURL(`image/${type}`),
+      }));
+    }),
+  ];
+  const unsafeUrls = [
+    'javascript:window.sourceInjection=true',
+    'JaVaScRiPt:window.sourceInjection=true',
+    '\tjava\nscript:window.sourceInjection=true',
+    'data:text/html,<script>window.sourceInjection=true</script>',
+    'data:image/svg+xml,<svg onload="window.sourceInjection=true"/>',
+    'https://example.invalid/source.png',
+    '//example.invalid/source.png',
+    'file:///invalid-source.png',
+    'data:image/png;base64,AAAA" onerror="window.sourceInjection=true',
+    null,
+    {url: validImages[0].data},
+  ];
+  const imageOwners = [
+    imageProject.room,
+    imageProject.furniture[0],
+    imageProject.objects[0],
+  ];
+  for (const [index, owner] of imageOwners.entries()) {
+    owner.images = [validImages[index], validImages[index]];
+  }
+  for (const [index, data] of unsafeUrls.entries()) {
+    imageOwners[index % imageOwners.length].images.push({
+      name: `unsafe-${index}`,
+      data,
+    });
+  }
+  // Exercise the viewer's own boundary with an unnormalized exported payload.
+  await exportHTML(imageProject, 'output/browser-source-safety.html');
+  await page.goto(pathToFileURL(
+      path.resolve('output/browser-source-safety.html'),
+  ).href);
+  assert.equal(await page.locator('#sources a').count(), 3);
+  assert.equal(await page.locator('#sources img').count(), 3);
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#sources img')].every(
+        (img) => img.naturalWidth === 1,
+    ),
+  );
+  for (const [index, source] of validImages.entries()) {
+    const link = page.locator('#sources a').nth(index);
+    assert.equal(await link.getAttribute('href'), source.data);
+    assert.equal(await link.getAttribute('download'), source.name);
+    assert.equal(await link.textContent(), source.name);
+    assert.equal(await link.locator('img').getAttribute('alt'), source.name);
+  }
+  for (const index of unsafeUrls.keys()) {
+    assert.ok((await page.locator('#sources').textContent()).includes(
+        `unsafe-${index}`,
+    ));
+  }
+  assert.equal(await page.evaluate(() => window.sourceInjection), undefined);
+  assert.deepEqual(network, []);
+  assert.deepEqual(errors, []);
   spatial.objects.find((item) => item.id === 'books').x = 100;
   await exportHTML(spatial, 'output/spatial-demo.html');
   await page.setViewportSize({width: 1440, height: 980});

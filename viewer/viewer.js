@@ -213,6 +213,16 @@ function sources() {
       continue;
     }
     seen.add(source.data);
+    // Embedded JSON is untrusted here, even when CLI imports were validated.
+    if (
+      typeof source.data !== 'string' ||
+      !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(source.data)
+    ) {
+      getElement('sources').append(createElement(
+          'span', `${source.name}（表示できない画像形式）`, 'evidence',
+      ));
+      continue;
+    }
     const a = createElement('a');
     a.href = source.data;
     a.download = source.name;
