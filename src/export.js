@@ -54,9 +54,10 @@ export async function exportHTML(project, output) {
     })),
     sourceIndexes: Object.fromEntries((project.analysis?.sources ?? []).map(
         (source) => {
-          const images = [project.room, ...project.furniture,
+          const images = [...[project.room, ...project.furniture,
             ...(project.objects ?? [])].filter(Boolean)
-              .flatMap((item) => item.images ?? []);
+              .flatMap((item) => item.images ?? []),
+          ...(project.analysis?.images ?? [])];
           const unique = [...new Map(images.map((image) =>
             [image.data, image],
           )).values()];

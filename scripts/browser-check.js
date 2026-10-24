@@ -412,6 +412,44 @@ try {
   ));
   assert.deepEqual(network, []);
   assert.deepEqual(errors, []);
+  const aliases = structuredClone(normalized);
+  aliases.analysis.sources.push({
+    ...aliases.analysis.sources[0], id: 'photo-alias',
+  });
+  const clockDetection = aliases.analysis.detections.find((entry) =>
+    entry.id === 'clock',
+  );
+  aliases.analysis.detections.push({
+    ...clockDetection, id: 'clock-alias', imageId: 'photo-alias',
+  });
+  await exportHTML(normalizeProject(aliases), 'output/aliased-sources.html');
+  await page.goto(spatialUrl('aliased-sources.html'));
+  assert.equal(await page.locator('#sources a').count(), 1);
+  await page.locator('#sources button').click();
+  assert.equal(await page.locator('#image-boxes button').count(), 24);
+  await page.getByRole('button', {name: '検出 clock-alias', exact: true}).click();
+  assert.equal(await page.evaluate(() => window.oheyaKaeViewer.selected),
+      'clock');
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  const archived = normalizeProject({
+    ...normalized, room: null, furniture: [], objects: [], proposals: [],
+    analysis: {...normalized.analysis, regions: [], detections: [{
+      ...clockDetection, targetId: null, decision: 'pending',
+    }]},
+  });
+  await exportHTML(archived, 'output/archived-source.html');
+  await page.goto(spatialUrl('archived-source.html'));
+  await page.locator('#sources button').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#inspection-image').naturalWidth === 1,
+  );
+  assert.equal(await page.locator('#image-boxes button').count(), 1);
+  await page.getByRole('button', {name: '検出 clock', exact: true}).click();
+  assert.equal(await page.evaluate(() => window.oheyaKaeViewer.selected),
+      'detection:clock');
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  assert.deepEqual(network, []);
+  assert.deepEqual(errors, []);
   const shapeData = JSON.parse(await readFile(
       'test/fixtures/spatial-room.json', 'utf8',
   ));

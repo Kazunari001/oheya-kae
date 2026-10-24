@@ -35,7 +35,7 @@ let labels = [];
 let pickMeshes = [];
 let span = 6;
 let objectFilter = 'all';
-let inspectedImage = null;
+let inspectedImageIds = new Set();
 const detections = project.analysis?.detections ?? [];
 const isPlaced = (item) => [item.width, item.depth, item.height, item.y]
     .every((value) => value != null);
@@ -335,9 +335,10 @@ function sources() {
     getElement('sources').append(a);
     const inspect = createElement('button', `${source.name}を拡大・検出枠を確認`);
     inspect.onclick = () => {
-      inspectedImage = Object.keys(payload.sourceIndexes ?? {}).find((id) =>
-        payload.sourceIndexes[id] === index,
-      ) ?? null;
+      inspectedImageIds = new Set(Object.keys(payload.sourceIndexes ?? {})
+          .filter((id) =>
+            payload.sourceIndexes[id] === index,
+          ));
       getElement('inspection-image').src = source.data;
       getElement('inspection-image').alt = source.name;
       showDetail(getElement('image-selection'));
@@ -357,7 +358,7 @@ function drawDetectionBoxes() {
   const focused = document.activeElement?.dataset.detectionId;
   getElement('image-boxes').replaceChildren();
   for (const detection of detections.filter((entry) =>
-    entry.imageId === inspectedImage,
+    inspectedImageIds.has(entry.imageId),
   )) {
     const target = activeFurniture.find((item) =>
       item.id === detection.targetId,
