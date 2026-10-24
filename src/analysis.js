@@ -189,10 +189,38 @@ export function analysisSchema(kind) {
       furniture: arraySchema(FURNITURE_SCHEMA),
     });
     schema.properties.objects = arraySchema(FURNITURE_SCHEMA);
+    schema.properties.analysis = detectionSchema();
     schema.properties.room.properties.id = STRING_SCHEMA;
     return schema;
   }
-  return objectSchema({[kind]: FURNITURE_SCHEMA});
+  const schema = objectSchema({[kind]: FURNITURE_SCHEMA});
+  schema.properties.analysis = detectionSchema();
+  return schema;
+}
+
+function detectionSchema() {
+  const box = {type: 'array', items: {type: 'number', minimum: 0, maximum: 1},
+    minItems: 4, maxItems: 4};
+  const confidence = {type: ['number', 'null'], minimum: 0, maximum: 1};
+  return objectSchema({
+    sources: arraySchema(objectSchema({
+      id: STRING_SCHEMA, sha256: STRING_SCHEMA,
+    })),
+    regions: arraySchema(objectSchema({
+      id: STRING_SCHEMA, imageId: STRING_SCHEMA, box,
+    })),
+    detections: arraySchema(objectSchema({
+      id: STRING_SCHEMA, imageId: STRING_SCHEMA, box,
+      regionId: {type: ['string', 'null']},
+      targetId: {type: ['string', 'null']},
+      model: STRING_SCHEMA,
+      presenceProbability: confidence,
+      boxConfidence: confidence,
+      categoryConfidence: confidence,
+      decision: {type: 'string', enum: ['accepted', 'excluded', 'pending']},
+      reason: STRING_SCHEMA,
+    })),
+  });
 }
 /**
  * Describe the analysis contract for the caller AI, including uncertainty.
@@ -223,7 +251,13 @@ export function analysisPrompt(kind) {
     'reliable scale from pixels without a known ' +
     'reference. Optional objects holds small items. ' +
     'Assign stable ids. parentId references a furniture/object id ' +
-    'or the room id for wall attachments. Child x,y,z and rotation ' +
+    'or the room id for wall attachments. ' +
+    'Optional analysis records source SHA-256, detections and regions. ' +
+    'All boxes are [x,y,width,height] normalized to 0..1; a detection ' +
+    'with regionId uses crop-local coordinates. Keep model answers, ' +
+    'probabilities, excluded candidates and reasons. Confidence describes ' +
+    'detection, never physical measurement accuracy. ' +
+    'Child x,y,z and rotation ' +
     'are local to the parent; y is the bottom elevation, not height. ' +
     'Use attachment floor/on/inside/wall/part; inside requires ' +
     'surfaceId. supports defines local board top y, width, depth, ' +

@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {requireValue} from './errors.js';
 import {simplePolygon, openingGeometry, footprint, contained} from './geometry.js';
 import {resolveItems} from './scene.js';
+import {normalizeAnalysis, validateAnalysisLinks} from './detections.js';
 
 export const STATUSES = [
   'estimated',
@@ -106,7 +107,12 @@ function notes(value = []) {
   );
   return value.map((n) => string(n, 'uncertainty'));
 }
-function images(value = []) {
+/**
+ * Validate embedded source images at both scene and provenance boundaries.
+ * @param {!Array<!Object>} value Image names and raster data URLs.
+ * @return {!Array<!Object>} Normalized embedded images.
+ */
+export function normalizeImages(value = []) {
   requireValue(Array.isArray(value), 'images must be an array');
   return value.map((i) => {
     object(i, 'image');
@@ -266,7 +272,7 @@ export function normalizeFurniture(
       ? (raw.parentId ? null : 0)
       : (raw.y === null ? null : number(raw.y, 'y')),
     frameThickness: number(raw.frameThickness ?? 20, 'frameThickness', 1, 1e6),
-    images: images(raw.images),
+    images: normalizeImages(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
   requireValue(
@@ -394,7 +400,7 @@ export function normalizeRoom(
     outline,
     height: dimension(raw.height, 'height'),
     openings: [],
-    images: images(raw.images),
+    images: normalizeImages(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
   requireValue(
@@ -549,6 +555,8 @@ export function normalizeProject(raw) {
       normalizeFurniture(item, {trusted: true}),
     ),
     proposals: [],
+    ...(raw.analysis === undefined
+      ? {} : {analysis: normalizeAnalysis(raw.analysis)}),
   };
   requireValue(
       new Set(project.furniture.map((furniture) => furniture.id))
@@ -556,6 +564,7 @@ export function normalizeProject(raw) {
       'Duplicate furniture IDs',
   );
   validateRelationships(project);
+  validateAnalysisLinks(project);
   project.proposals = (raw.proposals ?? []).map((value) => {
     object(value, 'proposal');
     requireValue(

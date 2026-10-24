@@ -19,6 +19,45 @@ function run(project, ...args) {
       {encoding: 'utf8'}));
 }
 
+test('CLI deletes sole image owners while retaining pending source candidates',
+    async (t) => {
+      const directory = await workspace(t);
+      const data = JSON.parse(await readFile(
+          'test/fixtures/detailed-analysis.json', 'utf8'));
+      const imageFile = path.join(directory, 'single.png');
+      const imageBytes = Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0' +
+          'lEQVR42mP8/x8AAwMCAO+jMZkAAAAASUVORK5CYII=', 'base64');
+      await writeFile(imageFile, imageBytes);
+      for (const kind of ['furniture', 'object']) {
+        for (const withRoom of [false, true]) {
+          const file = path.join(directory, `${kind}-${withRoom}.json`);
+          if (withRoom) {
+            run(file, 'room', 'create', '--width', '2000', '--depth', '2000');
+          }
+          const analysisFile = path.join(directory, `${kind}-analysis.json`);
+          await writeFile(analysisFile, JSON.stringify({
+            [kind]: {id: 'single'}, analysis: {
+              sources: data.analysis.sources, regions: [],
+              detections: [{...data.analysis.detections[7],
+                id: 'single-detection', targetId: 'single'}],
+            },
+          }));
+          run(file, kind, 'import', '--image', imageFile,
+              '--analysis', analysisFile);
+          run(file, kind, 'remove', '--id', 'single');
+          const saved = run(file, 'state').project;
+          assert.equal(saved.analysis.idMap['single-detection'], null);
+          assert.equal(saved.analysis.images.length, 1);
+          assert.equal(saved.analysis.detections[0].decision, 'pending');
+          const htmlFile = path.join(directory, `${kind}-${withRoom}.html`);
+          run(file, 'export', '--output', htmlFile);
+          assert.ok((await readFile(htmlFile, 'utf8'))
+              .includes(imageBytes.toString('base64')));
+        }
+      }
+    });
+
 test('CLI saves objects, follows parents and refuses orphaning or bad imports',
     async (t) => {
       const directory = await workspace(t);
@@ -132,4 +171,57 @@ test('CLI keeps estimated revisions, unknowns and explicit confirmations',
       }
       assert.equal(run(file, 'state').project.objects.at(-1)
           .evidence.width.history.length, 2);
+    });
+
+test('CLI merges detection imports and preserves files on invalid metadata',
+    async (t) => {
+      const directory = await workspace(t);
+      const file = path.join(directory, 'detections.json');
+      const image = path.join(directory, 'source.png');
+      await writeFile(image, Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0' +
+          'lEQVR42mP8/x8AAwMCAO+jMZkAAAAASUVORK5CYII=', 'base64'));
+      const source = 'test/fixtures/detailed-analysis.json';
+      run(file, 'room', 'import', '--image', image, '--analysis', source);
+      run(file, 'furniture', 'update', '--id', 'shelf', '--width', '1300');
+      run(file, 'room', 'import', '--merge', '--image', image,
+          '--analysis', source);
+      const state = run(file, 'state').project;
+      assert.equal(state.analysis.detections.length, 23);
+      assert.equal(state.furniture.length, 4);
+      assert.equal(state.objects.length, 6);
+      assert.equal(state.furniture[0].width, 1300);
+      const before = await readFile(file, 'utf8');
+      const invalid = JSON.parse(await readFile(source, 'utf8'));
+      invalid.analysis.sources[0].sha256 = '0'.repeat(64);
+      const bad = path.join(directory, 'bad.json');
+      await writeFile(bad, JSON.stringify(invalid));
+      const result = spawnSync(process.execPath,
+          ['bin/oheya-kae.js', '--project', file, 'room', 'import', '--merge',
+            '--image', image, '--analysis', bad], {encoding: 'utf8'});
+      assert.equal(result.status, 1);
+      assert.equal(await readFile(file, 'utf8'), before);
+      const nativeReport = path.join(directory, 'detection-report.json');
+      await writeFile(nativeReport, JSON.stringify({
+        model: 'external-detector', sha256: invalid.analysis.sources[0].sha256,
+        targets: [{
+          id: 'detected-shelf', name: '棚', role: 'furniture', kind: 'shelf',
+          included: true, presence: 0.9, box_confidence: 0.8,
+          box: {left: 0.1, top: 0.1, right: 0.4, bottom: 0.8},
+        }],
+      }));
+      // Correct the intentionally invalid hash used in the failure above.
+      const report = JSON.parse(await readFile(nativeReport, 'utf8'));
+      report.sha256 = state.analysis.sources[0].sha256;
+      await writeFile(nativeReport, JSON.stringify(report));
+      const nativeFile = path.join(directory, 'detected-project.json');
+      run(nativeFile, 'room', 'import', '--image', image,
+          '--detections', nativeReport);
+      const native = run(nativeFile, 'state').project;
+      assert.equal(native.furniture[0].id, 'detected-shelf');
+      assert.equal(native.furniture[0].width, null);
+      assert.equal(native.analysis.idMap['detected-shelf'], 'detected-shelf');
+      assert.equal(native.room.name, '画像解析の部屋');
+      assert.equal(native.analysis.sourceReport.model, 'external-detector');
+      assert.equal(Object.hasOwn(native.analysis, 'jevReport'), false);
     });
