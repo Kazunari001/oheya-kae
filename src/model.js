@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {requireValue} from './errors.js';
 import {simplePolygon, openingGeometry, footprint, contained} from './geometry.js';
-import {resolveItems} from './scene.js';
+import {resolveItems, movableRoots} from './scene.js';
 import {normalizeAnalysis, validateAnalysisLinks} from './detections.js';
 
 export const STATUSES = [
@@ -575,7 +575,7 @@ export function normalizeProject(raw) {
     const placements = value.placements.map((furniture) => {
       object(furniture, 'placement');
       requireValue(
-          project.furniture.some(
+          movableRoots(project).some(
               (item) => item.id === furniture.id,
           ) && !ids.has(furniture.id),
           'Invalid or duplicate proposal furniture ID',
@@ -589,8 +589,8 @@ export function normalizeProject(raw) {
       };
     });
     requireValue(
-        ids.size === project.furniture.length,
-        'A proposal must place every furniture item',
+        ids.size === movableRoots(project).length,
+        'A proposal must place every movable root',
     );
     return {
       id: identifier(value.id),

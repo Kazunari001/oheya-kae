@@ -138,7 +138,22 @@ id/sourceIdを使えば照合できます。単体のfurniture/object importも�
 metadataの全sourcesが今回の`--image`に含まれる必要があります。
 失敗した取り込みでは既存プロジェクトファイルを保持します。
 
-推定値の修正は[推定値の修正と確認履歴](estimates.md)を参照してください。
+## 推定値の修正と実測の確認
+
+```sh
+node bin/oheya-kae.js furniture update --id shelf --width 1200 --status estimated --note "既知の本の幅との比率"
+node bin/oheya-kae.js furniture move --id shelf --x 1500 --status estimated --note "配置プレビュー"
+node bin/oheya-kae.js object update --id clock --y 1500 --status estimated --note "画像から仮置き"
+node bin/oheya-kae.js furniture update --id shelf --width 1180 --status confirmed --note "メジャーで実測"
+node bin/oheya-kae.js furniture update --id shelf --confirm width
+```
+
+room update、room opening update、furniture update/move、object updateで
+`--status confirmed|estimated|image|unknown`を使えます。
+既定はconfirmedです。confirmed以外では`--note`が必要で、`--confirm`との併用は拒否します。
+寸法のnullはunknownのままです。unknown状態に数値を持たせて仮表示することもできます。
+履歴は元のunknown/null、モデル値、仮値、人の確認・再修正を区別します。
+本体による一律の寸法補完は行いません。
 
 ## ビューアー
 
@@ -147,4 +162,12 @@ metadataの全sourcesが今回の`--image`に含まれる必要があります�
 家具・小物・開口部・画像上だけの候補を切り替えられ、寸法不明でも一覧に残ります。
 子の寸法ラベルは親か子を選んだときに表示し、重なるラベルを抑制します。
 
-原画像・枠・データは単一HTMLへ内包し、外部通信なしで利用できます。
+面積・寸法ラベル・一覧の未確認寸法には「仮」を付けます。
+確認項目は物体ごとの仮寸法・配置と属性にまとめ、幾何の問題は配置チェックに、
+pendingまたは有無/枠/種類の値が0.6未満の候補は「検出の曖昧さ」に表示します。
+これは表示上の確認目安で、検出精度を評価した閾値ではありません。
+検出数は除外候補を含み、3D表示数・未配置数は本体物体、画像のみはtargetId=nullの数です。
+原画像、枠、データは単一HTMLへ内包し、外部通信なしで利用できます。
+
+回帰テストには23候補の合成データを使います。個人の室内写真は含めません。
+テストは取り込み・保存・表示の確認であり、Jev等の検出精度を評価するものではありません。

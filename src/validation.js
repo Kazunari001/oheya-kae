@@ -1,6 +1,6 @@
 import {footprint, contained, overlap, openingGeometry} from './geometry.js';
-import {corrections} from './model.js';
-import {resolveItems, worldParts} from './scene.js';
+import {corrections, revise} from './model.js';
+import {resolveItems, worldParts, movableRoots} from './scene.js';
 
 const TOLERANCE = 1e-6;
 
@@ -154,6 +154,18 @@ export function validate(project) {
   const parts = new Map(ready.map((item) => [item.id, worldParts(item)]));
   for (let i = 0; i < ready.length; i++) {
     for (let j = i + 1; j < ready.length; j++) {
+      const partOf = (child, parent) => {
+        while (child?.attachment === 'part') {
+          if (child.parentId === parent.id) {
+            return true;
+          }
+          child = lookup.get(child.parentId);
+        }
+        return false;
+      };
+      if (partOf(ready[i], ready[j]) || partOf(ready[j], ready[i])) {
+        continue;
+      }
       if (parts.get(ready[i].id).some((a) =>
         parts.get(ready[j].id).some((b) =>
           verticalOverlap(a, b) && overlap(footprint(a), footprint(b)),
@@ -167,13 +179,46 @@ export function validate(project) {
       }
     }
   }
+  const detectionChecks = (project.analysis?.detections ?? []).filter((entry) =>
+    entry.decision !== 'excluded' && (entry.decision === 'pending' ||
+        ['presenceProbability', 'boxConfidence', 'categoryConfidence'].some(
+            (key) => entry[key] != null && entry[key] < 0.6,
+        )),
+  );
   return {
-    valid: issues.length === 0 && unresolved.length === 0,
+    valid: issues.length === 0 && unresolved.length === 0 &&
+        detectionChecks.length === 0,
     geometryValid: issues.length === 0,
-    provisional: unresolved.length > 0,
+    provisional: unresolved.length > 0 || detectionChecks.length > 0,
     issues,
     corrections: unresolved,
+    correctionGroups: correctionGroups(unresolved),
+    detectionChecks,
+    counts: {
+      detected: project.analysis?.detections.length ?? items.length,
+      displayed: ready.length,
+      unplaced: items.length - ready.length,
+      imageOnly: project.analysis?.detections.filter((entry) =>
+        !entry.targetId,
+      ).length ?? 0,
+    },
   };
+}
+
+function correctionGroups(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const field = entry.path.split('.').at(-1);
+    const type = ['width', 'depth', 'height', 'outline', 'supports',
+      'x', 'y', 'z', 'rotation', 'offset', 'sill'].includes(field)
+      ? 'measurement' : 'attribute';
+    const key = `${entry.objectId ?? 'room'}:${type}`;
+    if (!groups.has(key)) {
+      groups.set(key, {objectId: entry.objectId, type, entries: []});
+    }
+    groups.get(key).entries.push(entry);
+  }
+  return [...groups.values()];
 }
 /**
  * Create a project view with proposed placements and estimated provenance.
@@ -182,31 +227,24 @@ export function validate(project) {
  * @return {!Object} Project view; unmatched furniture retains its state.
  */
 export function applyPlacements(project, placements) {
+  const allowed = new Set(movableRoots(project).map((item) => item.id));
   return {
     ...project,
     furniture: project.furniture.map((furniture) => {
       const placement = placements.find(
           (candidate) => candidate.id === furniture.id,
       );
-      if (!placement) {
+      if (!placement || !allowed.has(furniture.id)) {
         return furniture;
       }
-      return {
+      const next = {
         ...furniture,
         ...placement,
-        evidence: {
-          ...furniture.evidence,
-          ...Object.fromEntries(
-              ['x', 'z', 'rotation'].map((key) => [
-                key,
-                {
-                  status: 'estimated',
-                  note: '配置案の位置・回転。実位置は未確認。',
-                },
-              ]),
-          ),
-        },
+        evidence: {...furniture.evidence},
       };
+      revise(next, furniture, ['x', 'z', 'rotation'], 'estimated',
+          '配置案の位置・回転。実位置は未確認。');
+      return next;
     }),
   };
 }

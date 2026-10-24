@@ -39,6 +39,9 @@ let inspectedImageIds = new Set();
 const detections = project.analysis?.detections ?? [];
 const isPlaced = (item) => [item.width, item.depth, item.height, item.y]
     .every((value) => value != null);
+const isProvisional = (item, keys) => keys.some((key) =>
+  item?.evidence?.[key]?.status !== 'confirmed',
+);
 function visibleItem(item) {
   const collection = project.objects?.some((entry) => entry.id === item.id)
     ? 'objects' : 'furniture';
@@ -170,9 +173,18 @@ function updatePanel() {
     `${room?.openings.length ?? 0}` +
     ' 開口部';
   getElement('area').textContent = room?.outline
-    ? (Math.abs(area(room.outline)) / 1e6).toFixed(1)
+    ? (Math.abs(area(room.outline)) / 1e6).toFixed(1) +
+    (isProvisional(room, ['outline']) ? '（仮）' : '')
     : '—';
   getElement('count').textContent = activeFurniture.length;
+  const displayed = activeFurniture.filter((item) =>
+    isPlaced(item) && visibleItem(item),
+  ).length;
+  getElement('object-counts').textContent =
+    `検出 ${detections.length || activeFurniture.length} · ` +
+    `3D表示 ${displayed} · ` +
+    `未配置 ${activeFurniture.filter((item) => !isPlaced(item)).length} · ` +
+    `画像のみ ${detections.filter((entry) => !entry.targetId).length}`;
   const invalidIds = new Set(
       report.issues.flatMap((i) => i.objectIds),
   );
@@ -218,7 +230,8 @@ function updatePanel() {
             `${formatMillimeters(furniture.depth)}` +
             ' × ' +
             `${formatMillimeters(furniture.height)}` +
-            (isPlaced(furniture) ? '' : ' · 未配置'),
+            (isProvisional(furniture, ['width', 'depth', 'height'])
+              ? '（仮寸法）' : '') + (isPlaced(furniture) ? '' : ' · 未配置'),
         ),
     );
     button.append(copy);
@@ -271,16 +284,29 @@ function updatePanel() {
     validation.append(issueList);
   }
   getElement('corrections').replaceChildren();
-  for (const c of report.corrections) {
-    getElement('corrections').append(
-        createElement(
-            'li',
-            `${c.path}` +
-            ' · ' +
-            `${STATUS_NAMES[c.status]}` +
-            `${c.note ? ' — ' + c.note : ''}`,
-        ),
-    );
+  for (const correction of report.correctionGroups ?? []) {
+    const row = createElement('li');
+    const details = createElement('details');
+    const name = activeFurniture.find((item) => item.id === correction.objectId)
+        ?.name ?? correction.objectId ?? '部屋';
+    details.append(createElement('summary', `${name} · ` +
+    `${correction.type === 'measurement' ? '仮寸法・配置' : '属性'} ` +
+    `${correction.entries.length}項目`));
+    for (const entry of correction.entries) {
+      details.append(createElement('p',
+          `${entry.path} · ${STATUS_NAMES[entry.status]} · ${entry.note}`));
+    }
+    row.append(details);
+    getElement('corrections').append(row);
+  }
+  for (const detection of report.detectionChecks ?? []) {
+    const row = createElement('li');
+    const button = createElement('button',
+        `検出の曖昧さ: ${detection.id} · ${detection.reason}`);
+    button.onclick = () => select(detection.targetId ??
+        `detection:${detection.id}`);
+    row.append(button);
+    getElement('corrections').append(row);
   }
   showDetail();
 }
@@ -645,7 +671,7 @@ function makeFurniture(furniture, isInvalid) {
         `${Math.round(furniture.width)}` +
         ' × ' +
         `${Math.round(furniture.depth)}` +
-        '',
+        (isProvisional(furniture, ['width', 'depth']) ? '（仮）' : ''),
         furniture.x / 1000,
         furniture.y / 1000 + h + 0.12,
         furniture.z / 1000,
@@ -785,7 +811,7 @@ function drawScene() {
       group.add(edgeLine);
       label(
           `${Math.round(length * 1000).toLocaleString()} mm` +
-          '',
+          (isProvisional(room, ['outline']) ? '（仮）' : ''),
           (a[0] + b[0]) / 2000,
           0.035,
           (a[1] + b[1]) / 2000,
@@ -870,7 +896,7 @@ function drawScene() {
           `${o.type === 'door' ? 'ドア' : '窓'}` +
           ' ' +
           `${Math.round(o.width)}` +
-          ' mm',
+          ' mm' + (isProvisional(o, ['width']) ? '（仮）' : ''),
           openingGroup.position.x,
           0.08,
           openingGroup.position.z,
