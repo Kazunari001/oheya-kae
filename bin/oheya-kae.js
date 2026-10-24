@@ -3,7 +3,7 @@ import {Command, InvalidArgumentError} from 'commander';
 import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {AppError, requireValue} from '../src/errors.js';
-import {normalizeRoom, normalizeFurniture, corrections, confirmed, number, object, KINDS} from '../src/model.js';
+import {normalizeRoom, normalizeFurniture, corrections, confirmed, revise, number, object, KINDS} from '../src/model.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
@@ -203,6 +203,23 @@ function explicitConfirm(options, keys) {
   confirmed(options, keys);
 }
 
+function revisionOptions(command) {
+  return command
+      .option('--status <status>', 'confirmed|estimated|image|unknown',
+          'confirmed')
+      .option('--note <text>', 'Basis or assumption for the updated values');
+}
+
+function recordUpdate(next, previous, keys, options) {
+  requireValue(options.status === 'confirmed' ||
+      typeof options.note === 'string' && options.note.trim().length > 0,
+  'Estimated updates require --note with their basis or assumption');
+  requireValue(options.status === 'confirmed' || !options.confirm?.length,
+      'Use a separate --status confirmed update to confirm fields');
+  revise(next, previous, keys, options.status,
+      options.note ?? 'CLIで入力・確認済み。');
+}
+
 cli
     .command('state')
     .description(
@@ -315,7 +332,7 @@ importOptions(room.command('import'))
         };
       });
     });
-geometryOptions(room.command('update'))
+revisionOptions(geometryOptions(room.command('update')))
     .option('--name <name>')
     .option('--outline <json>')
     .option(
@@ -374,21 +391,27 @@ geometryOptions(room.command('update'))
             {...old, ...patch},
             {trusted: true},
         );
-        confirmed(
+        recordUpdate(
             project.room,
+            old,
             Object.keys(patch).filter((k) =>
               Object.hasOwn(project.room.evidence, k),
             ),
+            options,
         );
         if (patch.openings) {
           for (let i = 0; i < patch.openings.length; i++) {
-            confirmed(
+            recordUpdate(
                 project.room.openings[i],
+                old.openings.find((item) =>
+                  item.id === project.room.openings[i].id,
+                ) ?? {evidence: {}},
                 Object.keys(patch.openings[i]).filter(
                     (k) =>
                       patch.openings[i][k] != null &&
                       Object.hasOwn(project.room.openings[i].evidence, k),
                 ),
+                options,
             );
           }
         }
@@ -500,7 +523,7 @@ openingOptions(opening.command('add'))
         return {objectId: added.id, opening: added};
       }),
     );
-openingOptions(opening.command('update'))
+revisionOptions(openingOptions(opening.command('update')))
     .requiredOption('--id <id>')
     .option('--confirm <field>', 'Mark checked field', repeat, [])
     .action(async (options) =>
@@ -535,7 +558,7 @@ openingOptions(opening.command('update'))
         const updated = project.room.openings.find(
             (v) => v.id === options.id,
         );
-        confirmed(updated, Object.keys(patch));
+        recordUpdate(updated, old, Object.keys(patch), options);
         explicitConfirm(updated, options.confirm);
         return {objectId: options.id, opening: updated};
       }),
@@ -592,7 +615,7 @@ importOptions(furniture.command('import')).action(
       });
     },
 );
-furnitureOptions(furniture.command('update'))
+revisionOptions(furnitureOptions(furniture.command('update')))
     .requiredOption('--id <id>')
     .option('--data <json>', 'Partial attributes/uncertainties')
     .option('--confirm <field>', 'Mark checked field', repeat, [])
@@ -615,19 +638,20 @@ furnitureOptions(furniture.command('update'))
             {...item, ...patch},
             {trusted: true},
         );
-        confirmed(
+        recordUpdate(
             next,
+            item,
             Object.keys(patch).filter((k) =>
               FURNITURE_FIELDS.includes(k),
             ),
+            options,
         );
         explicitConfirm(next, options.confirm);
         project.furniture[project.furniture.indexOf(item)] = next;
         return {objectId: next.id, furniture: next};
       });
     });
-furniture
-    .command('move')
+revisionOptions(furniture.command('move'))
     .requiredOption('--id <id>')
     .option('--x <mm>', 'Center X', numeric)
     .option('--y <mm>', 'Bottom elevation', numeric)
@@ -641,8 +665,9 @@ furniture
             Object.keys(patch).length,
             'Specify x, y, z or rotation',
         );
+        const previous = structuredClone(item);
         Object.assign(item, patch);
-        confirmed(item, Object.keys(patch));
+        recordUpdate(item, previous, Object.keys(patch), options);
         return {objectId: item.id, furniture: item};
       }),
     );
@@ -718,7 +743,7 @@ importOptions(objects.command('import')).action(async (options) => {
     return {objectId: item.id, object: item};
   });
 });
-furnitureOptions(objects.command('update'))
+revisionOptions(furnitureOptions(objects.command('update')))
     .requiredOption('--id <id>')
     .option('--data <json>', 'Partial object attributes')
     .option('--confirm <field>', 'Mark checked field', repeat, [])
@@ -735,9 +760,10 @@ furnitureOptions(objects.command('update'))
         requireValue(index >= 0, `Object not found: ${options.id}`);
         const next = normalizeFurniture({...project.objects[index], ...patch},
             {trusted: true});
-        confirmed(next, Object.keys(patch).filter((key) =>
-          FURNITURE_FIELDS.includes(key),
-        ));
+        recordUpdate(next, project.objects[index],
+            Object.keys(patch).filter((key) =>
+              FURNITURE_FIELDS.includes(key),
+            ), options);
         explicitConfirm(next, options.confirm);
         project.objects[index] = next;
         return {objectId: next.id, object: next};

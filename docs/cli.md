@@ -114,6 +114,9 @@ node bin/oheya-kae.js furniture scale --id desk-1 --dimension width --length 120
 
 ## JSON契約と検証
 
+推定値を更新する場合は`--status estimated --note "根拠"`を指定します。
+詳しくは[推定値の修正と確認履歴](estimates.md)を参照してください。
+
 ```sh
 node bin/oheya-kae.js state
 node bin/oheya-kae.js layout validate --json
