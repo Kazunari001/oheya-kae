@@ -8,10 +8,10 @@ function boxFromEdges(box) {
 }
 
 /**
- * Convert the room-import skill's local report without calling an API.
+ * Convert a local detection report without calling an API.
  * Preserve crop transforms, model answers, excluded rows and unknown geometry.
  * @param {?Object} data Optional room analysis containing chosen dimensions.
- * @param {!Object} report Skill detections.json, including sha256 and targets.
+ * @param {!Object} report Detection JSON, including sha256 and targets.
  * @param {?Object} response Optional original response.json.
  * @return {!Object} Room analysis with canonical detection metadata.
  */
@@ -123,8 +123,8 @@ export function convertJevReport(data, report, response = null) {
       categoryConfidence: row.kind_confidence ?? null,
       decision: !row.included ? 'excluded' : targetId ? 'accepted' : 'pending',
       reason: row.reason ?? (row.included
-        ? '補助スキルで採用。実寸・支持関係は別途確認。'
-        : '補助スキルの閾値または種類判定により除外。'),
+        ? '検出レポートで採用。実寸・支持関係は別途確認。'
+        : '検出レポートの採否指定により除外。'),
       original: row,
     };
   });

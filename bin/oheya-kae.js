@@ -303,8 +303,8 @@ geometryOptions(room.command('create'))
 importOptions(room.command('import'))
     .option('--replace', 'Replace existing room')
     .option('--merge', 'Merge analysis, preserving confirmed fields and IDs')
-    .option('--detections <json>', 'Local Jev skill detections.json')
-    .option('--response <json>', 'Original local Jev response.json')
+    .option('--detections <json>', 'Local detection report JSON')
+    .option('--response <json>', 'Original local model response JSON')
     .action(async (options) => {
     // Check conflicts before reading the source images and analysis JSON.
       const current = await load(projectPath(), true);

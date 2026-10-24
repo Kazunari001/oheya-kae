@@ -45,14 +45,53 @@ furniture/objectsには追加しません。pending候補には仮の3D物体を
 確率とconfidenceは0〜1またはnullです。実寸の確からしさを表しません。
 生のモデル回答や補正理由はanalysis内の追加属性としても保持できます。
 
-## 再取り込み
+## 外部検出レポートの取り込み（互換入力）
 
-`jev-room-import`補助スキルのdetections.jsonは直接指定できます。
-従来のanalysis.json下書きにIDがなくても、候補名が一意なら対応付けます。
-小物はunknownの寸法・設置高さを保って独立した物体にし、元のparent_idを引き継ぎます。
+通常の取り込みには、`schema --kind room`の契約に合わせた解析JSONを
+`--analysis`で指定します。外部の解析ツールで得た検出結果を、以下の互換入力形式へ
+整形して`--detections`に渡すこともできます。特定の解析ツールやモデルには依存しません。
+
+`detections.json`の例です。sha256の説明用文字列を、元画像の実際のハッシュへ
+置き換えてください。
+
+```json
+{
+  "model": "external-detector",
+  "sha256": "元画像のバイト列のSHA-256（64桁の小文字hex）",
+  "targets": [{
+    "id": "shelf",
+    "name": "棚",
+    "role": "furniture",
+    "kind": "shelf",
+    "included": true,
+    "presence": 0.9,
+    "box": {"left": 0.1, "top": 0.2, "right": 0.4, "bottom": 0.8},
+    "box_confidence": 0.8,
+    "kind_confidence": 0.8
+  }]
+}
+```
+
+- `model`は解析に使ったモデル名、`sha256`は`--image`で渡す原画像のハッシュです。
+- `targets[].id`は一意で安定した検出ID、`name`は候補名です。
+  `role`は`furniture`・`object`・`opening`から指定します。
+- `kind`は本体の簡易形状です。`included`で採否を指定し、任意の`reason`に理由を残せます。
+  除外候補もレポートに残してください。
+- この形式の`box`は左上原点のleft/top/right/bottomを0〜1に正規化します。
+  上述の`analysis.detections[].box`の配列形式とは異なります。
+- `presence`は有無の確率、`box_confidence`と`kind_confidence`は枠・種類のconfidenceです。
+  不明な値はnullにし、実寸の確からしさとは分けます。
+- 小物の親は任意の`parent_id`で、同じレポート内の採用対象のIDを参照します。
+  検出枠から実寸や設置高さを自動補完しません。
+
+切り抜きを使用した場合は、`input_box`に切り抜き内の枠、`box`に原画像へ戻した枠を
+指定します。`input_transform.region`に原画像内の切り抜き範囲を
+left/top/right/bottomで記録します。対象ごとに範囲が異なる場合は
+`targets[].source_transform.region`を使用できます。変換と原画像の枠が一致しない入力は拒否します。
+
+`--analysis`を併用すると、物体のID・sourceId・一意な候補名で対応付けます。
 未配置の開口部と除外候補は画像上だけの候補に残します。
-元のinput_transform、input_box、採否、有無・Box・種類の値も保存します。
-response.jsonがある場合は`--response`で原回答を併せて保存できます。
+任意の原回答JSONは、`--response`で併せて保存できます。ファイル名は自由です。
 
 ```sh
 node bin/oheya-kae.js room import --image room.png --analysis analysis.json --detections detections.json --response response.json
@@ -60,6 +99,8 @@ node bin/oheya-kae.js room import --image room.png --analysis analysis.json --de
 
 `--analysis`を省略すると、不明寸法の下書きから作成します。
 本体は解析APIを呼び出しません。
+
+## 再取り込み
 
 ```sh
 node bin/oheya-kae.js room import --image room.png --analysis analysis.json

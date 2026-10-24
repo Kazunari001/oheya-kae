@@ -35,7 +35,7 @@ test('Jev report converts crop boxes and retains raw model answers', () => {
         box: {left: 0.5, top: 0.5, right: 0.6, bottom: 0.6}},
     ],
   };
-  // Legacy skill drafts have furniture names but no stable IDs or objects.
+  // Older analysis drafts have names but no stable IDs or objects.
   const legacy = {room: {outline: null, height: null},
     furniture: [{name: '棚', kind: 'shelf', width: null}]};
   const response = {
