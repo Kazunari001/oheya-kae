@@ -21,6 +21,7 @@ let activeFurniture = resolveItems(project);
 let report = payload.validation;
 let selected = null;
 let mode = '3d';
+let showNames = true;
 let showDimensions = true;
 let showWalls = true;
 let renderer;
@@ -812,8 +813,11 @@ function init() {
     renderer.render(scene, camera);
     for (const label of labels) {
       const projected = label.position.clone().project(camera);
+      const visible = label.el.classList.contains('furniture')
+        ? showNames
+        : showDimensions;
       label.el.style.display =
-        showDimensions &&
+        visible &&
         projected.z >= -1 &&
         projected.z <= 1 &&
         Math.abs(projected.x) < 1 &&
@@ -871,6 +875,10 @@ function init() {
   getElement('view-3d').onclick = () => setMode('3d');
   getElement('view-top').onclick = () => setMode('top');
   getElement('reset').onclick = resetView;
+  getElement('names').onclick = () => {
+    showNames = !showNames;
+    getElement('names').setAttribute('aria-pressed', String(showNames));
+  };
   getElement('walls').onclick = () => {
     showWalls = !showWalls;
     getElement('walls').setAttribute(

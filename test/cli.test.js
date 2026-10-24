@@ -445,12 +445,7 @@ test(
           JSON_DATA_PATTERN,
       )[1];
       assert.equal(JSON.parse(embedded).project.room.name, name);
-      const scripts = [
-        ...html.matchAll(/<script\b[^>]*>(.*?)<\/script>/gs),
-      ];
-      assert.equal(scripts.length, 2);
-      assert.ok(scripts[1][1].includes('WebGLRenderer'));
-      assert.ok(!scripts[1][1].includes('/*OHEYA_KAE_SCRIPT*/'));
+      // Script elements are checked with Chrome's HTML parser in browser-check.
     },
 );
 
