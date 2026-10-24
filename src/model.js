@@ -150,6 +150,44 @@ function supportSurfaces(value, furniture) {
     return surface;
   });
 }
+
+function normalizeHistory(history, trusted) {
+  requireValue(Array.isArray(history), 'Evidence history must be an array');
+  return history.map((entry) => {
+    object(entry, 'history entry');
+    requireValue(STATUSES.includes(entry.status), 'Invalid history status');
+    return {
+      value: structuredClone(entry.value ?? null),
+      status: !trusted && entry.status === 'confirmed'
+        ? 'estimated' : entry.status,
+      note: typeof entry.note === 'string' ? entry.note : '',
+    };
+  });
+}
+
+/**
+ * Record a revision without losing the original unknown or model value.
+ * @param {!Object} next Updated normalized item.
+ * @param {!Object} previous Item before the edit.
+ * @param {!Array<string>} keys Explicitly changed fields.
+ * @param {string} status New evidence status.
+ * @param {string} note Reason for the revision.
+ */
+export function revise(next, previous, keys, status, note) {
+  requireValue(STATUSES.includes(status), 'Invalid revision status');
+  for (const key of keys) {
+    const old = previous.evidence[key] ?? {status: 'unknown', note: ''};
+    next.evidence[key] = {
+      status: next[key] == null ? 'unknown' : status,
+      note,
+      history: [...(old.history ?? []), {
+        value: structuredClone(previous[key] ?? null),
+        status: old.status,
+        note: old.note,
+      }],
+    };
+  }
+}
 /**
  * Attach provenance while preventing imported data from claiming confirmation.
  * @param {!Object} fields Field values to describe.
@@ -187,6 +225,9 @@ function evidenceFor(
         typeof fieldEvidence.note === 'string'
           ? fieldEvidence.note
           : '',
+      ...(fieldEvidence.history !== undefined ? {
+        history: normalizeHistory(fieldEvidence.history, trusted),
+      } : {}),
     };
   }
   return result;
@@ -283,7 +324,8 @@ export function normalizeFurniture(
     'wall', 'y', 'supports', 'frameThickness',
   ].filter((key) =>
     (!['sourceId', 'parentId', 'surfaceId', 'wall'].includes(key) ||
-        furniture[key] != null) &&
+        furniture[key] != null ||
+        Object.hasOwn(raw.evidence ?? {}, key)) &&
         ((key === 'y' && furniture.y === null) ||
             Object.hasOwn(raw.evidence ?? {}, key) ||
             ((!trusted || raw.evidence === undefined) &&
@@ -617,6 +659,10 @@ export function corrections(project) {
     for (const [field, fieldEvidence] of Object.entries(
         item.evidence,
     )) {
+      if (['parentId', 'surfaceId', 'wall', 'sourceId'].includes(field) &&
+          item[field] == null) {
+        continue;
+      }
       if (fieldEvidence.status !== 'confirmed') {
         result.push({
           objectId: item.id,
@@ -663,14 +709,6 @@ export function corrections(project) {
  */
 export function confirmed(item, keys) {
   for (const key of keys) {
-    if (['parentId', 'surfaceId', 'wall', 'sourceId'].includes(key) &&
-        item[key] == null) {
-      delete item.evidence[key];
-      continue;
-    }
-    item.evidence[key] = {
-      status: item[key] == null ? 'unknown' : 'confirmed',
-      note: 'CLIで入力・確認済み。',
-    };
+    revise(item, item, [key], 'confirmed', 'CLIで入力・確認済み。');
   }
 }
