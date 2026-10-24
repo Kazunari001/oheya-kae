@@ -133,4 +133,3 @@ test('CLI keeps estimated revisions, unknowns and explicit confirmations',
       assert.equal(run(file, 'state').project.objects.at(-1)
           .evidence.width.history.length, 2);
     });
-
