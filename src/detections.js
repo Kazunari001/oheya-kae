@@ -18,6 +18,11 @@ export function normalizeAnalysis(raw) {
   requireValue(raw && typeof raw === 'object' && !Array.isArray(raw),
       'analysis must be an object');
   const result = structuredClone(raw);
+  // Keep legacy provenance intact while exposing a provider-neutral field.
+  if (!Object.hasOwn(result, 'sourceReport') &&
+      Object.hasOwn(result, 'jevReport')) {
+    result.sourceReport = structuredClone(result.jevReport);
+  }
   if (result.images !== undefined) {
     result.images = normalizeImages(result.images);
   }

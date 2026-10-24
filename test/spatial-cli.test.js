@@ -201,11 +201,11 @@ test('CLI merges detection imports and preserves files on invalid metadata',
             '--image', image, '--analysis', bad], {encoding: 'utf8'});
       assert.equal(result.status, 1);
       assert.equal(await readFile(file, 'utf8'), before);
-      const nativeReport = path.join(directory, 'jev.json');
+      const nativeReport = path.join(directory, 'detection-report.json');
       await writeFile(nativeReport, JSON.stringify({
-        model: 'jev-fixture', sha256: invalid.analysis.sources[0].sha256,
+        model: 'external-detector', sha256: invalid.analysis.sources[0].sha256,
         targets: [{
-          id: 'jev-shelf', name: 'Jevの棚', role: 'furniture', kind: 'shelf',
+          id: 'detected-shelf', name: '棚', role: 'furniture', kind: 'shelf',
           included: true, presence: 0.9, box_confidence: 0.8,
           box: {left: 0.1, top: 0.1, right: 0.4, bottom: 0.8},
         }],
@@ -214,11 +214,14 @@ test('CLI merges detection imports and preserves files on invalid metadata',
       const report = JSON.parse(await readFile(nativeReport, 'utf8'));
       report.sha256 = state.analysis.sources[0].sha256;
       await writeFile(nativeReport, JSON.stringify(report));
-      const nativeFile = path.join(directory, 'jev-project.json');
+      const nativeFile = path.join(directory, 'detected-project.json');
       run(nativeFile, 'room', 'import', '--image', image,
           '--detections', nativeReport);
       const native = run(nativeFile, 'state').project;
-      assert.equal(native.furniture[0].id, 'jev-shelf');
+      assert.equal(native.furniture[0].id, 'detected-shelf');
       assert.equal(native.furniture[0].width, null);
-      assert.equal(native.analysis.idMap['jev-shelf'], 'jev-shelf');
+      assert.equal(native.analysis.idMap['detected-shelf'], 'detected-shelf');
+      assert.equal(native.room.name, '画像解析の部屋');
+      assert.equal(native.analysis.sourceReport.model, 'external-detector');
+      assert.equal(Object.hasOwn(native.analysis, 'jevReport'), false);
     });

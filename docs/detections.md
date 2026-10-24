@@ -73,6 +73,7 @@ furniture/objectsには追加しません。pending候補には仮の3D物体を
 ```
 
 - `model`は解析に使ったモデル名、`sha256`は`--image`で渡す原画像のハッシュです。
+  モデル名は任意の識別子をそのまま保存し、解析元による処理の分岐は行いません。
 - `targets[].id`は一意で安定した検出ID、`name`は候補名です。
   `role`は`furniture`・`object`・`opening`から指定します。
 - `kind`は本体の簡易形状です。`included`で採否を指定し、任意の`reason`に理由を残せます。
@@ -92,6 +93,9 @@ left/top/right/bottomで記録します。対象ごとに範囲が異なる場�
 `--analysis`を併用すると、物体のID・sourceId・一意な候補名で対応付けます。
 未配置の開口部と除外候補は画像上だけの候補に残します。
 任意の原回答JSONは、`--response`で併せて保存できます。ファイル名は自由です。
+原回答の形式は解析元に依存して構いません。本体はその内容を解釈せず、
+検出レポートは`analysis.sourceReport`、原回答は`analysis.modelAnswer`に保持します。
+各解析元の出力から共通の入力形式への整形は、利用側で行ってください。
 
 ```sh
 node bin/oheya-kae.js room import --image room.png --analysis analysis.json --detections detections.json --response response.json
@@ -99,6 +103,10 @@ node bin/oheya-kae.js room import --image room.png --analysis analysis.json --de
 
 `--analysis`を省略すると、不明寸法の下書きから作成します。
 本体は解析APIを呼び出しません。
+
+旧データに`analysis.jevReport`がある場合は、その値を保持したまま
+`analysis.sourceReport`としても読み込みます。既にsourceReportがあれば優先し、
+新しい取り込みではsourceReportを使用します。
 
 ## 再取り込み
 

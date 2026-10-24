@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {emptyProject, normalizeProject, revise} from '../src/model.js';
 import {importAnalysis, normalizeAnalysis, unlinkDetection, imageHash} from '../src/detections.js';
-import {convertJevReport} from '../src/jev.js';
+import {convertDetectionReport} from '../src/detection-report.js';
 
 const analysis = JSON.parse(await readFile(
     new URL('./fixtures/detailed-analysis.json', import.meta.url), 'utf8'));
@@ -16,9 +16,9 @@ function imported() {
   return normalizeProject(project);
 }
 
-test('Jev report converts crop boxes and retains raw model answers', () => {
+test('detection reports preserve crop boxes and raw model answers', () => {
   const report = {
-    sha256: analysis.analysis.sources[0].sha256, model: 'jev-fixture',
+    sha256: analysis.analysis.sources[0].sha256, model: 'external-detector',
     input_transform: {region: {left: 0.1, top: 0.2, right: 0.4, bottom: 0.8},
       source_pixels: [100, 200, 400, 800], submitted_size: [300, 600]},
     targets: [
@@ -39,15 +39,16 @@ test('Jev report converts crop boxes and retains raw model answers', () => {
   const legacy = {room: {outline: null, height: null},
     furniture: [{name: '棚', kind: 'shelf', width: null}]};
   const response = {
-    model: 'jev-fixture', answers: {shelf_present: {noul: 0.95}},
+    model: 'external-detector', output: [{id: 'shelf', present: true}],
   };
-  const converted = convertJevReport(legacy, report, response);
+  const converted = convertDetectionReport(legacy, report, response);
   assert.equal(converted.furniture.length, 1);
   assert.equal(converted.furniture[0].id, 'shelf');
   assert.equal(converted.objects[0].parentId, 'shelf');
   assert.equal(converted.objects[0].y, null);
   assert.equal(converted.objects.length, 1);
-  assert.deepEqual(converted.analysis.jevReport, report);
+  assert.deepEqual(converted.analysis.sourceReport, report);
+  assert.equal(Object.hasOwn(converted.analysis, 'jevReport'), false);
   assert.deepEqual(converted.analysis.modelAnswer, response);
   assert.deepEqual(converted.analysis.detections[0].box,
       [0.1, 0.1, 0.8, 0.8]);
@@ -59,11 +60,65 @@ test('Jev report converts crop boxes and retains raw model answers', () => {
   assert.equal(project.furniture[0].width, null);
   const bad = structuredClone(report);
   bad.targets[0].box.left = 0.5;
-  assert.throws(() => convertJevReport(null, bad));
+  assert.throws(() => convertDetectionReport(null, bad));
   bad.targets[0] = report.targets[0];
   bad.targets[1].parent_id = 'missing';
-  assert.throws(() => convertJevReport(null, bad));
+  assert.throws(() => convertDetectionReport(null, bad));
 });
+
+test('different model identifiers and response shapes use the same import path',
+    () => {
+      const responses = [
+        ['vendor-a/vision', {output: [{label: '棚', score: 0.9}]}],
+        ['vendor-b/vision', {content: [{type: 'text', text: '棚を検出'}]}],
+        ['local-model', [{name: '棚', confirmed: true}]],
+      ];
+      const project = emptyProject();
+      for (const [model, response] of responses) {
+        const report = {
+          model, sha256: analysis.analysis.sources[0].sha256,
+          targets: [{id: 'shelf', name: '棚', role: 'furniture', kind: 'shelf',
+            included: true, presence: null, box_confidence: null,
+            kind_confidence: null,
+            box: {left: 0.1, top: 0.2, right: 0.4, bottom: 0.8}}],
+        };
+        const converted = convertDetectionReport(null, report, response);
+        assert.equal(converted.room.name, '画像解析の部屋');
+        assert.deepEqual(converted.analysis.sourceReport, report);
+        assert.deepEqual(converted.analysis.modelAnswer, response);
+        importAnalysis(project, converted, [image], 'room');
+        const saved = normalizeProject(JSON.parse(JSON.stringify(project)));
+        assert.equal(saved.furniture.length, 1);
+        assert.equal(saved.furniture[0].width, null);
+        assert.ok(Object.values(saved.furniture[0].evidence).every((entry) =>
+          entry.status !== 'confirmed',
+        ));
+        assert.equal(saved.analysis.detections[0].model, model);
+        assert.equal(saved.analysis.sourceReport.model, model);
+        assert.deepEqual(saved.analysis.modelAnswer, response);
+        assert.equal(Object.hasOwn(saved.analysis, 'jevReport'), false);
+      }
+      assert.equal(project.analysis.runs.length, 3);
+    });
+
+test('legacy report provenance remains readable without replacing new records',
+    () => {
+      const legacyReport = {model: 'legacy-detector', original: {score: 0.8}};
+      const project = imported();
+      project.analysis.jevReport = structuredClone(legacyReport);
+      const serialized = JSON.stringify(project);
+      const migrated = normalizeProject(JSON.parse(serialized));
+      assert.deepEqual(migrated.analysis.sourceReport, legacyReport);
+      assert.deepEqual(migrated.analysis.jevReport, legacyReport);
+      assert.equal(JSON.stringify(project), serialized);
+      assert.deepEqual(normalizeProject(JSON.parse(JSON.stringify(migrated))),
+          migrated);
+      migrated.analysis.sourceReport = {model: 'current-detector'};
+      const current = normalizeProject(migrated);
+      assert.deepEqual(current.analysis.sourceReport,
+          {model: 'current-detector'});
+      assert.deepEqual(current.analysis.jevReport, legacyReport);
+    });
 
 test('23 detections retain source, crop, raw answer and mapping', () => {
   const project = imported();

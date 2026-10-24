@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {AppError, requireValue} from '../src/errors.js';
 import {normalizeRoom, normalizeFurniture, corrections, confirmed, revise, number, object, KINDS} from '../src/model.js';
 import {importAnalysis, unlinkDetection} from '../src/detections.js';
-import {convertJevReport} from '../src/jev.js';
+import {convertDetectionReport} from '../src/detection-report.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
@@ -162,7 +162,7 @@ async function importData(kind, options) {
     }
   }
   if (options.detections) {
-    data = convertJevReport(data, await readJSON(options.detections),
+    data = convertDetectionReport(data, await readJSON(options.detections),
         options.response ? await readJSON(options.response) : null);
   } else {
     requireValue(!options.response, '--response requires --detections');

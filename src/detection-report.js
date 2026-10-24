@@ -3,7 +3,7 @@ import {requireValue} from './errors.js';
 import {normalizeAnalysis} from './detections.js';
 
 function boxFromEdges(box) {
-  requireValue(box && typeof box === 'object', 'Jev box is required');
+  requireValue(box && typeof box === 'object', 'Detection box is required');
   return [box.left, box.top, box.right - box.left, box.bottom - box.top];
 }
 
@@ -12,15 +12,15 @@ function boxFromEdges(box) {
  * Preserve crop transforms, model answers, excluded rows and unknown geometry.
  * @param {?Object} data Optional room analysis containing chosen dimensions.
  * @param {!Object} report Detection JSON, including sha256 and targets.
- * @param {?Object} response Optional original response.json.
+ * @param {*} response Optional opaque model response JSON.
  * @return {!Object} Room analysis with canonical detection metadata.
  */
-export function convertJevReport(data, report, response = null) {
+export function convertDetectionReport(data, report, response = null) {
   requireValue(report && Array.isArray(report.targets),
-      'Jev report must contain targets');
+      'Detection report must contain targets');
   const result = data?.room ? structuredClone(data) : {
     room: structuredClone(data ?? {
-      name: 'Jev画像解析の部屋', outline: null, height: null,
+      name: '画像解析の部屋', outline: null, height: null,
       uncertainties: ['部屋の輪郭・縮尺・天井高は未確認です。'],
     }),
     furniture: [], objects: [],
@@ -34,11 +34,11 @@ export function convertJevReport(data, report, response = null) {
   const rows = new Map();
   for (const row of report.targets) {
     requireValue(row && typeof row.id === 'string' && !rows.has(row.id),
-        'Invalid or duplicate Jev target ID');
+        'Invalid or duplicate detection target ID');
     requireValue(typeof row.included === 'boolean',
-        'Jev inclusion decision must be boolean');
+        'Detection inclusion decision must be boolean');
     requireValue(['furniture', 'object', 'opening'].includes(row.role),
-        'Invalid Jev target role');
+        'Invalid detection target role');
     rows.set(row.id, row);
   }
   for (const row of rows.values()) {
@@ -46,7 +46,7 @@ export function convertJevReport(data, report, response = null) {
     let parent = row.parent_id;
     while (parent) {
       requireValue(rows.has(parent) && !seen.has(parent),
-          'Missing or cyclic Jev parent target');
+          'Missing or cyclic detection parent target');
       seen.add(parent);
       parent = rows.get(parent).parent_id;
     }
@@ -59,10 +59,10 @@ export function convertJevReport(data, report, response = null) {
       : row.role === 'object' ? result.objects : result.furniture;
     const matches = collection.filter((item) => item.id === row.id ||
         item.sourceId === row.id || item.name === row.name);
-    requireValue(matches.length <= 1, 'Ambiguous Jev target match');
+    requireValue(matches.length <= 1, 'Ambiguous detection target match');
     let item = matches[0];
     requireValue(row.included || !item,
-        'Excluded Jev targets must not have scene items');
+        'Excluded detection targets must not have scene items');
     if (!item && row.included && row.role !== 'opening') {
       item = {
         id: row.id, sourceId: row.id, name: row.name,
@@ -99,7 +99,7 @@ export function convertJevReport(data, report, response = null) {
     let regionId = null;
     let box = boxFromEdges(row.box);
     if (row.input_box != null) {
-      requireValue(transform?.region, 'Missing Jev input transform');
+      requireValue(transform?.region, 'Missing detection input transform');
       const regionBox = boxFromEdges(transform.region);
       regionId = 'region-' + createHash('sha256')
           .update(JSON.stringify({imageId, transform}))
@@ -111,7 +111,7 @@ export function convertJevReport(data, report, response = null) {
         local[2] * regionBox[2], local[3] * regionBox[3]];
       requireValue(restored.every((value, index) =>
         Math.abs(value - box[index]) < 1e-6,
-      ), 'Jev source box disagrees with its crop transform');
+      ), 'Detection source box disagrees with its crop transform');
       box = local;
     }
     const targetId = targets.get(row.id)?.id ?? null;
@@ -131,7 +131,8 @@ export function convertJevReport(data, report, response = null) {
   result.analysis = normalizeAnalysis({
     sources: [{id: imageId, sha256: report.sha256}],
     regions: [...regions.values()], detections,
-    jevReport: structuredClone(report), modelAnswer: structuredClone(response),
+    sourceReport: structuredClone(report),
+    modelAnswer: structuredClone(response),
   });
   return result;
 }
