@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {AppError} from './errors.js';
 import {atomicWrite, withFileLock} from './store.js';
 import {validate, applyPlacements} from './validation.js';
+import {imageHash} from './detections.js';
 
 /**
  * Serialize a JSON-compatible value for an HTML script element.
@@ -51,6 +52,20 @@ export async function exportHTML(project, output) {
           applyPlacements(project, value.placements),
       ),
     })),
+    sourceIndexes: Object.fromEntries((project.analysis?.sources ?? []).map(
+        (source) => {
+          const images = [...[project.room, ...project.furniture,
+            ...(project.objects ?? [])].filter(Boolean)
+              .flatMap((item) => item.images ?? []),
+          ...(project.analysis?.images ?? [])];
+          const unique = [...new Map(images.map((image) =>
+            [image.data, image],
+          )).values()];
+          return [source.id, unique.findIndex((image) =>
+            imageHash(image) === source.sha256,
+          )];
+        },
+    )),
   };
   const escapedLicense = license
       .replace(/&/g, '&amp;')
