@@ -166,3 +166,5 @@ npm run test:browser
 `npm test`はビューアーをビルドし、形状判定、根拠管理、CLIの保存・読み込み・不正入力・HTML生成、画像と解析JSONのローカル取り込みを検証します。`npm run test:browser`はすべてのOSでGoogle Chromeのみを使い、`file://`とネットワークを無効にした環境で3D、選択、視点操作、寸法表示、配置比較、元画像表示、モバイル表示を確認します。事前にGoogle Chromeをインストールしてください（開発環境では`npx playwright install chrome`でも準備できます）。
 
 `viewer/`の編集後は`npm run build`で再ビルドし、HTMLを再出力してください。Three.jsとOrbitControlsは[公式のnpm利用方法](https://threejs.org/manual/pages/installation.html)に沿って取り込み、esbuildでIIFEにバンドルします。出力HTMLは外部import・CDN・fetchを使用しません。
+
+検出JSONと再取り込みは[検出データ](detections.md)を参照してください。

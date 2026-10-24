@@ -133,3 +133,53 @@ test('CLI keeps estimated revisions, unknowns and explicit confirmations',
       assert.equal(run(file, 'state').project.objects.at(-1)
           .evidence.width.history.length, 2);
     });
+
+test('CLI merges detection imports and preserves files on invalid metadata',
+    async (t) => {
+      const directory = await workspace(t);
+      const file = path.join(directory, 'detections.json');
+      const image = path.join(directory, 'source.png');
+      await writeFile(image, Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0' +
+          'lEQVR42mP8/x8AAwMCAO+jMZkAAAAASUVORK5CYII=', 'base64'));
+      const source = 'test/fixtures/detailed-analysis.json';
+      run(file, 'room', 'import', '--image', image, '--analysis', source);
+      run(file, 'furniture', 'update', '--id', 'shelf', '--width', '1300');
+      run(file, 'room', 'import', '--merge', '--image', image,
+          '--analysis', source);
+      const state = run(file, 'state').project;
+      assert.equal(state.analysis.detections.length, 23);
+      assert.equal(state.furniture.length, 4);
+      assert.equal(state.objects.length, 6);
+      assert.equal(state.furniture[0].width, 1300);
+      const before = await readFile(file, 'utf8');
+      const invalid = JSON.parse(await readFile(source, 'utf8'));
+      invalid.analysis.sources[0].sha256 = '0'.repeat(64);
+      const bad = path.join(directory, 'bad.json');
+      await writeFile(bad, JSON.stringify(invalid));
+      const result = spawnSync(process.execPath,
+          ['bin/oheya-kae.js', '--project', file, 'room', 'import', '--merge',
+            '--image', image, '--analysis', bad], {encoding: 'utf8'});
+      assert.equal(result.status, 1);
+      assert.equal(await readFile(file, 'utf8'), before);
+      const nativeReport = path.join(directory, 'jev.json');
+      await writeFile(nativeReport, JSON.stringify({
+        model: 'jev-fixture', sha256: invalid.analysis.sources[0].sha256,
+        targets: [{
+          id: 'jev-shelf', name: 'Jevの棚', role: 'furniture', kind: 'shelf',
+          included: true, presence: 0.9, box_confidence: 0.8,
+          box: {left: 0.1, top: 0.1, right: 0.4, bottom: 0.8},
+        }],
+      }));
+      // Correct the intentionally invalid hash used in the failure above.
+      const report = JSON.parse(await readFile(nativeReport, 'utf8'));
+      report.sha256 = state.analysis.sources[0].sha256;
+      await writeFile(nativeReport, JSON.stringify(report));
+      const nativeFile = path.join(directory, 'jev-project.json');
+      run(nativeFile, 'room', 'import', '--image', image,
+          '--detections', nativeReport);
+      const native = run(nativeFile, 'state').project;
+      assert.equal(native.furniture[0].id, 'jev-shelf');
+      assert.equal(native.furniture[0].width, null);
+      assert.equal(native.analysis.idMap['jev-shelf'], 'jev-shelf');
+    });

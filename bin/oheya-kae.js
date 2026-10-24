@@ -4,6 +4,8 @@ import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {AppError, requireValue} from '../src/errors.js';
 import {normalizeRoom, normalizeFurniture, corrections, confirmed, revise, number, object, KINDS} from '../src/model.js';
+import {importAnalysis, unlinkDetection} from '../src/detections.js';
+import {convertJevReport} from '../src/jev.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
@@ -130,7 +132,7 @@ function importOptions(command) {
  */
 async function importData(kind, options) {
   const images = await readImages(options.image);
-  const data = options.analysis
+  let data = options.analysis
     ? await readJSON(options.analysis)
     : null;
   if (options.analysis) {
@@ -158,6 +160,12 @@ async function importData(kind, options) {
       requireValue(!Object.hasOwn(data, other),
           `Expected ${kind} analysis, not ${other} analysis`);
     }
+  }
+  if (options.detections) {
+    data = convertJevReport(data, await readJSON(options.detections),
+        options.response ? await readJSON(options.response) : null);
+  } else {
+    requireValue(!options.response, '--response requires --detections');
   }
   return {images, data};
 }
@@ -294,12 +302,15 @@ geometryOptions(room.command('create'))
     });
 importOptions(room.command('import'))
     .option('--replace', 'Replace existing room')
+    .option('--merge', 'Merge analysis, preserving confirmed fields and IDs')
+    .option('--detections <json>', 'Local Jev skill detections.json')
+    .option('--response <json>', 'Original local Jev response.json')
     .action(async (options) => {
     // Check conflicts before reading the source images and analysis JSON.
       const current = await load(projectPath(), true);
       requireValue(
-          !current.room || options.replace,
-          'Room already exists; use --replace',
+          !current.room || options.replace || options.merge,
+          'Room already exists; use --replace or --merge',
       );
       const {images, data} = await importData('room', options);
       const raw = data?.room ??
@@ -309,26 +320,21 @@ importOptions(room.command('import'))
           '実寸で部屋形状・寸法・開口部を補正してください。',
         ],
       };
-      const currentRoom = normalizeRoom({...raw, images});
-      const furniture = (data?.furniture ?? []).map((item) =>
-        normalizeFurniture({...item, images}),
-      );
-      const objects = (data?.objects ?? []).map((item) =>
-        normalizeFurniture({...item, images}),
-      );
       await changed((project) => {
         requireValue(
-            !project.room || options.replace,
-            'Room already exists; use --replace',
+            !project.room || options.replace || options.merge,
+            'Room already exists; use --replace or --merge',
         );
-        project.room = currentRoom;
-        project.furniture.push(...furniture);
-        project.objects.push(...objects);
+        if (options.replace && !options.merge) {
+          project.room = null;
+        }
+        const currentRoom = importAnalysis(project,
+            data ?? {room: raw}, images, 'room');
         return {
           objectId: currentRoom.id,
           room: currentRoom,
-          addedFurniture: furniture,
-          addedObjects: objects,
+          addedFurniture: project.furniture,
+          addedObjects: project.objects,
         };
       });
     });
@@ -576,6 +582,7 @@ opening
         currentRoom.openings = currentRoom.openings.filter(
             (opening) => opening.id !== options.id,
         );
+        unlinkDetection(project, options.id);
         confirmed(currentRoom, ['openings']);
         return {objectId: options.id, removed: true};
       }),
@@ -608,9 +615,8 @@ importOptions(furniture.command('import')).action(
           '画像からの属性・寸法・形状は未解析です。解析JSONまたは実寸を入力してください。',
         ],
       };
-      const item = normalizeFurniture({...raw, images});
       await changed((project) => {
-        project.furniture.push(item);
+        const item = importAnalysis(project, data ?? raw, images, 'furniture');
         return {objectId: item.id, furniture: item};
       });
     },
@@ -715,6 +721,7 @@ furniture
         project.furniture = project.furniture.filter(
             (item) => item.id !== options.id,
         );
+        unlinkDetection(project, options.id);
         return {objectId: options.id, removed: true};
       }),
     );
@@ -737,9 +744,8 @@ furnitureOptions(objects.command('add'))
     });
 importOptions(objects.command('import')).action(async (options) => {
   const {images, data} = await importData('object', options);
-  const item = normalizeFurniture({...data?.object ?? data ?? {}, images});
   await changed((project) => {
-    project.objects.push(item);
+    const item = importAnalysis(project, data ?? {}, images, 'object');
     return {objectId: item.id, object: item};
   });
 });
@@ -775,6 +781,7 @@ objects.command('remove')
       const index = project.objects.findIndex((item) => item.id === options.id);
       requireValue(index >= 0, `Object not found: ${options.id}`);
       project.objects.splice(index, 1);
+      unlinkDetection(project, options.id);
       return {objectId: options.id, removed: true};
     }));
 

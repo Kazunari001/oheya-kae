@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {requireValue} from './errors.js';
 import {simplePolygon, openingGeometry, footprint, contained} from './geometry.js';
 import {resolveItems} from './scene.js';
+import {normalizeAnalysis, validateAnalysisLinks} from './detections.js';
 
 export const STATUSES = [
   'estimated',
@@ -549,6 +550,8 @@ export function normalizeProject(raw) {
       normalizeFurniture(item, {trusted: true}),
     ),
     proposals: [],
+    ...(raw.analysis === undefined
+      ? {} : {analysis: normalizeAnalysis(raw.analysis)}),
   };
   requireValue(
       new Set(project.furniture.map((furniture) => furniture.id))
@@ -556,6 +559,7 @@ export function normalizeProject(raw) {
       'Duplicate furniture IDs',
   );
   validateRelationships(project);
+  validateAnalysisLinks(project);
   project.proposals = (raw.proposals ?? []).map((value) => {
     object(value, 'proposal');
     requireValue(
