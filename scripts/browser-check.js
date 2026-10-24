@@ -262,6 +262,7 @@ try {
   ).href);
   assert.equal(await page.locator('#sources a').count(), 3);
   assert.equal(await page.locator('#sources img').count(), 3);
+  assert.equal(await page.locator('#sources button').count(), 3);
   await page.waitForFunction(() =>
     [...document.querySelectorAll('#sources img')].every(
         (img) => img.naturalWidth === 1,
@@ -273,6 +274,15 @@ try {
     assert.equal(await link.getAttribute('download'), source.name);
     assert.equal(await link.textContent(), source.name);
     assert.equal(await link.locator('img').getAttribute('alt'), source.name);
+    await page.locator('#sources button').nth(index).click();
+    await page.waitForFunction(() =>
+      document.querySelector('#inspection-image').naturalWidth === 1,
+    );
+    assert.equal(await page.locator('#inspection-image').getAttribute('src'),
+        source.data);
+    assert.equal(await page.locator('#inspection-image').getAttribute('alt'),
+        source.name);
+    await page.getByRole('button', {name: '閉じる', exact: true}).click();
   }
   for (const index of unsafeUrls.keys()) {
     assert.ok((await page.locator('#sources').textContent()).includes(

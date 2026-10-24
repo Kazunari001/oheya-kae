@@ -310,15 +310,16 @@ function sources() {
   const seen = new Set();
   let sourceIndex = 0;
   for (const source of list) {
-    if (seen.has(source.data)) {
+    const imageData = source.data;
+    if (seen.has(imageData)) {
       continue;
     }
-    seen.add(source.data);
+    seen.add(imageData);
     const index = sourceIndex++;
     // Embedded JSON is untrusted here, even when CLI imports were validated.
     if (
-      typeof source.data !== 'string' ||
-      !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(source.data)
+      typeof imageData !== 'string' ||
+      !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageData)
     ) {
       getElement('sources').append(createElement(
           'span', `${source.name}（表示できない画像形式）`, 'evidence',
@@ -326,20 +327,28 @@ function sources() {
       continue;
     }
     const a = createElement('a');
-    a.href = source.data;
+    a.href = imageData;
     a.download = source.name;
     const img = createElement('img');
-    img.src = source.data;
+    img.src = imageData;
     img.alt = source.name;
     a.append(img, createElement('span', source.name));
     getElement('sources').append(a);
     const inspect = createElement('button', `${source.name}を拡大・検出枠を確認`);
     inspect.onclick = () => {
+      // Enforce the URL boundary at this asynchronous sink as well.
+      if (
+        typeof imageData !== 'string' ||
+        !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageData)
+      ) {
+        getElement('status').textContent = '元画像のURLが不正です。';
+        return;
+      }
       inspectedImageIds = new Set(Object.keys(payload.sourceIndexes ?? {})
           .filter((id) =>
             payload.sourceIndexes[id] === index,
           ));
-      getElement('inspection-image').src = source.data;
+      getElement('inspection-image').src = imageData;
       getElement('inspection-image').alt = source.name;
       showDetail(getElement('image-selection'));
       drawDetectionBoxes();
