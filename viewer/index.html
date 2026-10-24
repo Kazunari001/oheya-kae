@@ -37,10 +37,32 @@
         </select>
         <div id="proposal-note" class="proposal-note"></div>
         <h2>OBJECTS / 家具・小物</h2>
+        <label for="object-filter">表示する種類</label>
+        <select id="object-filter">
+          <option value="all">すべて</option>
+          <option value="furniture">家具</option>
+          <option value="objects">小物</option>
+          <option value="openings">開口部</option>
+          <option value="candidates">画像上の候補</option>
+        </select>
+        <p id="object-counts" class="evidence"></p>
         <div id="furniture-list"></div>
         <div id="detail" class="detail"></div>
         <h2>SOURCE IMAGES / 元画像</h2>
         <div id="sources" class="sources"></div>
+        <dialog id="image-dialog" aria-labelledby="image-title">
+          <h2 id="image-title">元画像と検出枠</h2>
+          <button id="close-image">閉じる</button>
+          <label for="image-zoom">拡大</label>
+          <input id="image-zoom" type="range" min="100" max="300" value="100">
+          <div class="image-scroll">
+            <div id="image-stage" class="image-stage">
+              <img id="inspection-image" alt="">
+              <div id="image-boxes"></div>
+            </div>
+          </div>
+          <div id="image-selection" class="detail" aria-live="polite"></div>
+        </dialog>
         <h2>TO CONFIRM / 補正・確認</h2>
         <ul id="corrections" class="corrections"></ul>
         <details>

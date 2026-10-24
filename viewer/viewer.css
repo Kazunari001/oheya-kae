@@ -445,3 +445,89 @@ a:focus-visible {
   white-space: pre-wrap;
   font: inherit;
 }
+
+.detail pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detail button,
+.sources button {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+}
+
+.corrections details {
+  margin-top: 6px;
+}
+
+#object-filter {
+  width: 100%;
+}
+
+#furniture-list {
+  max-height: min(440px, 40dvh);
+  overflow: auto;
+}
+
+#image-dialog {
+  width: min(1000px, 95vw);
+  max-height: 90dvh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+#image-dialog::backdrop {
+  background: #172b2499;
+}
+
+.image-scroll {
+  width: 100%;
+  overflow: auto;
+  max-height: 65dvh;
+  margin-top: 12px;
+}
+
+.image-stage {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+
+#inspection-image {
+  width: 100%;
+  display: block;
+}
+
+.detection-box {
+  position: absolute;
+  border: 2px solid #b95840;
+  background: #ffffff10;
+  color: #172b24;
+  font-size: 12px;
+  text-align: left;
+  padding: 0;
+  overflow: hidden;
+}
+
+.detection-box[aria-pressed='true'] {
+  border: 4px solid #224e3d;
+  background: #b3c4b340;
+}
+
+#image-selection {
+  overflow-wrap: anywhere;
+  margin-top: 12px;
+}
+
+@media (max-width: 550px) {
+  .furniture-button {
+    width: 100%;
+    display: flex;
+  }
+}

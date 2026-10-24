@@ -4,7 +4,8 @@ import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {load} from '../src/store.js';
-import {normalizeProject} from '../src/model.js';
+import {normalizeProject, emptyProject} from '../src/model.js';
+import {importAnalysis} from '../src/detections.js';
 import {exportHTML} from '../src/export.js';
 import * as THREE from 'three';
 
@@ -339,6 +340,76 @@ try {
   await exportHTML(spatial, 'output/spatial-unknown.html');
   await page.goto(spatialUrl('spatial-unknown.html'));
   await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 5);
+  const detailed = emptyProject();
+  importAnalysis(detailed, JSON.parse(await readFile(
+      'test/fixtures/detailed-analysis.json', 'utf8',
+  )), withImages.room.images, 'room');
+  const normalized = normalizeProject(detailed);
+  await exportHTML(normalized, 'output/detailed-demo.html');
+  await page.goto(spatialUrl('detailed-demo.html'));
+  await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 9);
+  await page.locator('.furniture-button[data-id="shelf"]').click();
+  assert.match(await page.locator('#detail').innerText(), /内容物: 下段の本/);
+  await page.locator('#sources button').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#inspection-image').naturalWidth === 1,
+  );
+  assert.equal(await page.locator('#image-boxes button').count(), 23);
+  const crop = page.getByRole('button', {name: '検出 shelf', exact: true});
+  assert.equal(await crop.evaluate((node) => node.style.left), '13%');
+  assert.equal(await crop.evaluate((node) => node.style.width), '24%');
+  const clockBox = page.getByRole('button', {name: '検出 clock', exact: true});
+  await clockBox.focus();
+  await clockBox.press('Enter');
+  assert.equal(await clockBox.evaluate((node) =>
+    node === document.activeElement,
+  ), true);
+  assert.equal(await clockBox.getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.evaluate(() => window.oheyaKaeViewer.selected),
+      'clock');
+  assert.match(await page.locator('#image-selection').innerText(),
+      /壁の時計.*意味上の種類/s);
+  assert.equal(await page.locator('#image-selection dl').count(), 1);
+  assert.match(await page.locator('#image-selection').innerText(),
+      /confidenceは実寸/);
+  await page.locator('#image-zoom').focus();
+  await page.locator('#image-zoom').press('End');
+  assert.equal(await page.locator('#image-stage').evaluate((node) =>
+    node.style.width,
+  ), '300%');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#image-dialog').isVisible(), false);
+  assert.equal(await page.locator('.furniture-button[data-id="clock"]')
+      .getAttribute('aria-pressed'), 'true');
+  await page.locator('#object-filter').selectOption('objects');
+  assert.equal(await page.locator('#furniture-list .furniture-button').count(),
+      6);
+  assert.equal(await page.evaluate(() => window.oheyaKaeViewer.meshCount), 5);
+  await page.locator('.furniture-button[data-id="unlocated"]').click();
+  assert.match(await page.locator('#detail').innerText(), /未配置/);
+  await page.locator('#object-filter').selectOption('openings');
+  await page.getByRole('button', {name: 'ドア door', exact: true}).click();
+  assert.match(await page.locator('#detail').innerText(), /800 mm/);
+  await page.locator('#object-filter').selectOption('candidates');
+  await page.getByRole('button', {
+    name: '画像上の候補 candidate-22 · excluded', exact: true,
+  }).click();
+  assert.match(await page.locator('#detail').innerText(), /excluded/);
+  await page.locator('#object-filter').selectOption('all');
+  await page.locator('.furniture-button[data-id="shelf"]').click();
+  await page.screenshot({path: 'output/detailed-demo.png', fullPage: true});
+  await page.setViewportSize({width: 390, height: 844});
+  await page.locator('#sources button').click();
+  await page.getByRole('button', {name: '検出 clock', exact: true}).click();
+  const dialogBounds = await page.locator('#image-dialog').boundingBox();
+  assert.ok(dialogBounds.width <= 390);
+  await page.screenshot({
+    path: 'output/detailed-mobile.png', fullPage: true,
+  });
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  assert.ok(await page.locator('body').evaluate((node) =>
+    node.scrollWidth <= window.innerWidth,
+  ));
   assert.deepEqual(network, []);
   assert.deepEqual(errors, []);
   const shapeData = JSON.parse(await readFile(
@@ -358,7 +429,8 @@ try {
   console.log(
       'Browser checks passed: file://, offline, 3D, ' +
       'selection, orbit, top view, dimensions, proposal ' +
-      'comparison, mobile, support surfaces, elevated objects, parent moves.',
+      'comparison, mobile, support surfaces, elevated objects, parent moves, ' +
+      '23 detections, crop boxes, image selection, filters and keyboard.',
   );
 } finally {
   await browser.close();
