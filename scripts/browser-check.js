@@ -341,6 +341,20 @@ try {
   await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 5);
   assert.deepEqual(network, []);
   assert.deepEqual(errors, []);
+  const shapeData = JSON.parse(await readFile(
+      'test/fixtures/spatial-room.json', 'utf8',
+  ));
+  for (const [index, kind] of ['books', 'appliance', 'screen', 'clock',
+    'screen'].entries()) {
+    shapeData.objects[index].kind = kind;
+  }
+  shapeData.furniture.push({id: 'rack', kind: 'clothes_rack',
+    width: 900, depth: 500, height: 1600, x: 3000, z: 3000});
+  shapeData.objects.push({id: 'lamp', kind: 'lamp',
+    width: 200, depth: 200, height: 1200, x: 3000, z: 3800});
+  await exportHTML(normalizeProject(shapeData), 'output/shapes-demo.html');
+  await page.goto(spatialUrl('shapes-demo.html'));
+  await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 10);
   console.log(
       'Browser checks passed: file://, offline, 3D, ' +
       'selection, orbit, top view, dimensions, proposal ' +

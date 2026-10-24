@@ -70,6 +70,39 @@ export function solidParts(item) {
   const box = (x, y, z, w, h, d) => ({
     x, y, z, width: w, height: h, depth: d, rotation: 0,
   });
+  if (item.kind === 'clothes_rack') {
+    const t = Math.min(item.frameThickness, width / 4, depth / 4, height / 4);
+    return [
+      box(0, height - t, 0, width, t, t),
+      ...[-1, 1].flatMap((side) => [
+        box(side * (width - t) / 2, 0, 0, t, height, t),
+        box(side * (width - t) / 2, 0, 0, t, t, depth),
+      ]),
+    ];
+  }
+  if (item.kind === 'books') {
+    return Array.from({length: 5}, (_, index) => box(
+        -width / 2 + width * (index + 0.5) / 5, 0, 0,
+        width / 5 * 0.96, height * (index % 2 ? 0.9 : 1), depth,
+    ));
+  }
+  if (item.kind === 'screen') {
+    const base = Math.min(30, height / 10);
+    return [
+      box(0, height * 0.2, -depth * 0.3,
+          width, height * 0.8, depth * 0.4),
+      box(0, base, 0, width * 0.08, height * 0.2 - base, depth * 0.2),
+      box(0, 0, 0, width * 0.6, base, depth),
+    ];
+  }
+  if (item.kind === 'lamp') {
+    return [
+      box(0, 0, 0, width, height * 0.05, depth),
+      box(0, height * 0.05, 0,
+          width * 0.08, height * 0.65, depth * 0.08),
+      box(0, height * 0.7, 0, width, height * 0.3, depth),
+    ];
+  }
   if (item.kind === 'shelf' && item.supports?.length) {
     const thickness = item.frameThickness;
     const parts = item.supports.map((surface) => box(
