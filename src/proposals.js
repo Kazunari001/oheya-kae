@@ -1,8 +1,8 @@
 import {AppError} from './errors.js';
 import {footprint, overlap, contained, openingGeometry} from './geometry.js';
 import {id} from './model.js';
-import {validate, applyPlacements} from './validation.js';
-import {movableRoots, resolveItems} from './scene.js';
+import {validate, applyPlacements, createPlacementCheck} from './validation.js';
+import {movableRoots} from './scene.js';
 
 // Deterministic grid packing, not an optimal solver. Never call a failed
 
@@ -81,6 +81,10 @@ export function propose(
     const notes = [];
     const placements = [];
     for (const furniture of ordered) {
+      const canPlace = createPlacementCheck(
+          applyPlacements(project, placements), furniture.id,
+          new Set(ordered.slice(placed.length + 1).map((item) => item.id)),
+      );
       let best = null;
       let bestScore = Infinity;
       for (const candidate of candidates) {
@@ -99,46 +103,7 @@ export function propose(
           ) {
             continue;
           }
-          // Check the complete moving subtree, including fixed obstacles.
-          // Unplaced roots retain their positions until their own turn.
-          const preview = applyPlacements(project, [...placements, {
-            id: furniture.id, ...candidate, rotation,
-          }]);
-          const descendants = new Set([furniture.id]);
-          const items = resolveItems(preview);
-          let changed = true;
-          while (changed) {
-            changed = false;
-            for (const child of items) {
-              if (descendants.has(child.parentId) &&
-                  !descendants.has(child.id)) {
-                descendants.add(child.id);
-                changed = true;
-              }
-            }
-          }
-          const waiting = new Set(ordered.slice(placed.length + 1)
-              .map((entry) => entry.id));
-          let expanded = true;
-          while (expanded) {
-            expanded = false;
-            for (const child of items) {
-              if (waiting.has(child.parentId) && !waiting.has(child.id)) {
-                waiting.add(child.id);
-                expanded = true;
-              }
-            }
-          }
-          const trial = {
-            ...preview,
-            furniture: preview.furniture.filter((entry) =>
-              !waiting.has(entry.id),
-            ),
-            objects: preview.objects.filter((entry) => !waiting.has(entry.id)),
-          };
-          if (validate(trial).issues.some((issue) =>
-            issue.objectIds.some((itemId) => descendants.has(itemId)),
-          )) {
+          if (!canPlace(item)) {
             continue;
           }
           // Keep the center open; alternate the preferred wall/corner. Work

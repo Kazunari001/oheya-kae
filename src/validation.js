@@ -9,6 +9,140 @@ function verticalOverlap(a, b) {
       b.y + b.height > a.y + TOLERANCE;
 }
 
+function partOf(child, parent, lookup) {
+  while (child?.attachment === 'part') {
+    if (child.parentId === parent.id) {
+      return true;
+    }
+    child = lookup.get(child.parentId);
+  }
+  return false;
+}
+
+function withBounds(part, polygon) {
+  const xs = polygon.map(([x]) => x);
+  const zs = polygon.map(([, z]) => z);
+  return {...part, polygon, bounds: {
+    minX: Math.min(...xs), maxX: Math.max(...xs),
+    minZ: Math.min(...zs), maxZ: Math.max(...zs),
+  }};
+}
+
+function occupiedParts(item) {
+  return worldParts(item).map((part) => withBounds(part, footprint(part)));
+}
+
+function partsOverlap(first, second) {
+  return first.some((a) => second.some((b) =>
+    verticalOverlap(a, b) &&
+    a.bounds.minX < b.bounds.maxX && b.bounds.minX < a.bounds.maxX &&
+    a.bounds.minZ < b.bounds.maxZ && b.bounds.minZ < a.bounds.maxZ &&
+    overlap(a.polygon, b.polygon),
+  ));
+}
+
+function descendants(ids, items) {
+  const children = new Map();
+  for (const item of items) {
+    if (!children.has(item.parentId)) {
+      children.set(item.parentId, []);
+    }
+    children.get(item.parentId).push(item.id);
+  }
+  const result = new Set(ids);
+  for (const id of result) {
+    for (const child of children.get(id) ?? []) {
+      result.add(child);
+    }
+  }
+  return result;
+}
+
+/**
+ * Cache fixed geometry and validate only a rigidly moving floor-root subtree.
+ * Supports and internal collisions are invariant under horizontal movement.
+ * @param {!Object} project Current placements with normalized local geometry.
+ * @param {string} rootId Floor-level furniture root to move.
+ * @param {!Set<string>} ignored Root IDs still waiting to be placed.
+ * @return {function(!Object): boolean} Geometry-only x/z and rotation check.
+ */
+export function createPlacementCheck(project, rootId, ignored = new Set()) {
+  const items = resolveItems(project);
+  const lookup = new Map(items.map((item) => [item.id, item]));
+  const root = lookup.get(rootId);
+  if (!root || root.parentId || root.y !== 0) {
+    throw new Error('Placement checks require a floor-level root');
+  }
+  const movingIds = descendants([rootId], items);
+  const ignoredIds = descendants(ignored, items);
+  const moving = items.filter((item) => movingIds.has(item.id));
+  const ready = (item) =>
+    [item.width, item.depth, item.height, item.y].every((v) => v != null);
+  let invalid = moving.some((item) => !ready(item) ||
+      (project.room?.height != null &&
+          item.y + item.height > project.room.height));
+  if (invalid) {
+    return () => false;
+  }
+  for (const item of moving) {
+    checkSupport(project, item, lookup, () => {
+      invalid = true;
+    });
+  }
+  const parts = new Map(moving.map((item) =>
+    [item.id, occupiedParts(item)],
+  ));
+  for (let i = 0; i < moving.length; i++) {
+    for (let j = i + 1; j < moving.length; j++) {
+      if (!partOf(moving[i], moving[j], lookup) &&
+          !partOf(moving[j], moving[i], lookup) &&
+          partsOverlap(parts.get(moving[i].id), parts.get(moving[j].id))) {
+        invalid = true;
+      }
+    }
+  }
+  if (invalid) {
+    return () => false;
+  }
+  const obstacles = items.filter((item) => ready(item) &&
+      !movingIds.has(item.id) && !ignoredIds.has(item.id))
+      .flatMap(occupiedParts);
+  const doors = (project.room?.openings ?? [])
+      .filter((opening) => opening.type === 'door')
+      .map((opening) => ({...opening,
+        polygon: openingGeometry(project.room, opening).zone}));
+  const relative = (polygon) => polygon.map(([x, z]) =>
+    [x - root.x, z - root.z],
+  );
+  const envelopes = moving.map((item) => ({...item,
+    polygon: relative(footprint(item))}));
+  const solids = [...parts.values()].flat().map((part) => ({...part,
+    polygon: relative(part.polygon)}));
+  return (placement) => {
+    const radians = (placement.rotation - root.rotation) * Math.PI / 180;
+    const cosine = Math.cos(radians);
+    const sine = Math.sin(radians);
+    const transform = (polygon) => polygon.map(([x, z]) => [
+      placement.x + x * cosine + z * sine,
+      placement.z - x * sine + z * cosine,
+    ]);
+    for (const item of envelopes) {
+      const polygon = transform(item.polygon);
+      if ((project.room?.outline &&
+          !contained(polygon, project.room.outline)) ||
+          doors.some((door) =>
+            item.y < door.sill + door.height - TOLERANCE &&
+            item.y + item.height > TOLERANCE && overlap(polygon, door.polygon),
+          )) {
+        return false;
+      }
+    }
+    return !solids.some((part) => partsOverlap([
+      withBounds(part, transform(part.polygon)),
+    ], obstacles));
+  };
+}
+
 function wallAttachmentFits(room, item) {
   const start = room.outline[item.wall];
   const end = room.outline[(item.wall + 1) % room.outline.length];
@@ -151,26 +285,14 @@ export function validate(project) {
       }
     }
   }
-  const parts = new Map(ready.map((item) => [item.id, worldParts(item)]));
+  const parts = new Map(ready.map((item) => [item.id, occupiedParts(item)]));
   for (let i = 0; i < ready.length; i++) {
     for (let j = i + 1; j < ready.length; j++) {
-      const partOf = (child, parent) => {
-        while (child?.attachment === 'part') {
-          if (child.parentId === parent.id) {
-            return true;
-          }
-          child = lookup.get(child.parentId);
-        }
-        return false;
-      };
-      if (partOf(ready[i], ready[j]) || partOf(ready[j], ready[i])) {
+      if (partOf(ready[i], ready[j], lookup) ||
+          partOf(ready[j], ready[i], lookup)) {
         continue;
       }
-      if (parts.get(ready[i].id).some((a) =>
-        parts.get(ready[j].id).some((b) =>
-          verticalOverlap(a, b) && overlap(footprint(a), footprint(b)),
-        ),
-      )) {
+      if (partsOverlap(parts.get(ready[i].id), parts.get(ready[j].id))) {
         issue(
             'FURNITURE_OVERLAP',
             [ready[i].id, ready[j].id],

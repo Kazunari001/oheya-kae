@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {emptyProject, normalizeProject} from '../src/model.js';
 import {importAnalysis} from '../src/detections.js';
 import {propose} from '../src/proposals.js';
-import {applyPlacements, validate} from '../src/validation.js';
+import {applyPlacements, validate, createPlacementCheck} from '../src/validation.js';
 import {resolveItems} from '../src/scene.js';
 
 const analysis = JSON.parse(await readFile(
@@ -70,4 +70,85 @@ test('proposals move roots with contents and keep wall items and parts local',
       assert.deepEqual(applyPlacements(project, [
         {id: 'books', x: 9999, z: 9999, rotation: 20},
       ]).furniture, project.furniture);
+    });
+
+function relatedIds(project, initial) {
+  const ids = new Set(initial);
+  const items = [...project.furniture, ...project.objects];
+  for (const id of ids) {
+    for (const item of items) {
+      if (item.parentId === id) {
+        ids.add(item.id);
+      }
+    }
+  }
+  return ids;
+}
+
+function checkAgainstFullValidation(project, rootId, ignored, placements) {
+  const original = structuredClone(project);
+  const movingIds = relatedIds(project, [rootId]);
+  const ignoredIds = relatedIds(project, ignored);
+  const check = createPlacementCheck(project, rootId, new Set(ignored));
+  for (const placement of placements) {
+    const trial = applyPlacements(project, [{id: rootId, ...placement}]);
+    trial.furniture = trial.furniture.filter((item) =>
+      !ignoredIds.has(item.id),
+    );
+    trial.objects = trial.objects.filter((item) => !ignoredIds.has(item.id));
+    const expected = !validate(trial).issues.some((issue) =>
+      issue.objectIds.some((id) => movingIds.has(id)),
+    );
+    assert.equal(check(placement), expected,
+        `${rootId} at ${JSON.stringify(placement)}`);
+  }
+  assert.deepEqual(project, original);
+}
+
+test('cached candidate checks match full geometry across moving hierarchies',
+    () => {
+      const project = imported();
+      project.objects.push({
+        ...structuredClone(project.objects[0]), id: 'frame-part',
+        parentId: 'rack', attachment: 'part', surfaceId: null,
+        x: 0, y: 0, z: 0, width: 20, depth: 20, height: 1600,
+      });
+      const placements = [];
+      for (const x of [100, 600, 1200, 2000, 3000, 3900]) {
+        for (const z of [100, 900, 2200, 4000, 4900]) {
+          for (const rotation of [0, 90, 180, 270, 37]) {
+            placements.push({x, z, rotation});
+          }
+        }
+      }
+      for (const rootId of ['shelf', 'stand', 'desk', 'rack']) {
+        for (const ignored of [[], ['stand', 'desk'].filter((id) =>
+          id !== rootId,
+        )]) {
+          checkAgainstFullValidation(project, rootId, ignored, placements);
+        }
+      }
+    });
+
+test('cached checks retain invariant support, ceiling and internal collisions',
+    () => {
+      const mutations = [
+        (project) => project.objects[0].height = null,
+        (project) => project.objects[0].y = 110,
+        (project) => project.objects[0].y = -10,
+        (project) => project.room.height = 1000,
+        (project) => project.objects.push({
+          ...structuredClone(project.objects[0]), id: 'duplicate-books',
+        }),
+        (project) => project.objects[1].surfaceId = 'lower',
+      ];
+      for (const mutate of mutations) {
+        const project = imported();
+        mutate(project);
+        checkAgainstFullValidation(project, 'shelf', [], [
+          {x: 900, z: 1000, rotation: 90},
+          {x: 2500, z: 2500, rotation: 0},
+          {x: 2500, z: 2500, rotation: 90},
+        ]);
+      }
     });
