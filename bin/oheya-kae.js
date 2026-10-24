@@ -3,7 +3,7 @@ import {Command, InvalidArgumentError} from 'commander';
 import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {AppError, requireValue} from '../src/errors.js';
-import {normalizeRoom, normalizeFurniture, corrections, confirmed, number, object} from '../src/model.js';
+import {normalizeRoom, normalizeFurniture, corrections, confirmed, number, object, KINDS} from '../src/model.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
@@ -95,7 +95,7 @@ function furnitureOptions(command) {
       .option('--name <name>')
       .option(
           '--kind <kind>',
-          'box|desk|table|chair|sofa|bed|shelf|cabinet',
+          KINDS.join('|'),
       )
       .option('--color <hex>', '#RRGGBB')
       .option('--x <mm>', 'Footprint center X', numeric)

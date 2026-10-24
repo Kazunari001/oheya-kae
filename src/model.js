@@ -18,6 +18,12 @@ export const KINDS = [
   'bed',
   'shelf',
   'cabinet',
+  'clothes_rack',
+  'clock',
+  'books',
+  'appliance',
+  'screen',
+  'lamp',
 ];
 export const ATTACHMENTS = ['floor', 'on', 'inside', 'wall', 'part'];
 /**

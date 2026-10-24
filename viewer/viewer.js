@@ -332,7 +332,8 @@ function makeFurniture(furniture, isInvalid) {
   const h = furniture.height / 1000;
   const col = isInvalid ? '#cb765c' : furniture.color;
   const openShelf = furniture.kind === 'shelf' && furniture.supports.length > 0;
-  if (openShelf) {
+  const openFrame = openShelf || furniture.kind === 'clothes_rack';
+  if (openFrame || ['books', 'screen', 'lamp'].includes(furniture.kind)) {
     for (const part of solidParts(furniture)) {
       const mesh = box(meshGroup, part.width / 1000, part.height / 1000,
           part.depth / 1000, part.x / 1000,
@@ -340,6 +341,19 @@ function makeFurniture(furniture, isInvalid) {
       mesh.userData.id = furniture.id;
       pickMeshes.push(mesh);
     }
+  } else if (furniture.kind === 'clock') {
+    const face = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
+        new THREE.MeshStandardMaterial({color: col}),
+    );
+    face.rotation.x = Math.PI / 2;
+    face.scale.set(w, d, h);
+    face.position.y = h / 2;
+    meshGroup.add(face);
+    box(meshGroup, w * 0.04, h * 0.28, d * 0.1,
+        0, h * 0.6, d * 0.46, '#283d37');
+    box(meshGroup, w * 0.25, h * 0.04, d * 0.1,
+        w * 0.1, h / 2, d * 0.46, '#283d37');
   } else if (['desk', 'table'].includes(furniture.kind)) {
     const thick = Math.min(0.06, h / 5);
     box(meshGroup, w, thick, d, 0, h - thick / 2, 0, col);
@@ -399,6 +413,12 @@ function makeFurniture(furniture, isInvalid) {
     }
   } else {
     box(meshGroup, w, h, d, 0, h / 2, 0, col);
+    if (furniture.kind === 'appliance') {
+      box(meshGroup, w * 0.8, h * 0.65, d * 0.02,
+          0, h * 0.45, d * 0.48, '#344343');
+      box(meshGroup, w * 0.6, h * 0.04, d * 0.04,
+          0, h * 0.83, d * 0.48, '#a5a8ad');
+    }
     if (['shelf', 'cabinet'].includes(furniture.kind)) {
       for (let j = 1; j < 4; j++) {
         box(
@@ -431,7 +451,7 @@ function makeFurniture(furniture, isInvalid) {
   );
   outline.position.y = h / 2;
   meshGroup.add(outline);
-  if (openShelf) {
+  if (openFrame) {
     bounds.dispose();
   } else {
     const hit = new THREE.Mesh(
