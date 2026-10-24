@@ -412,8 +412,12 @@ function makeFurniture(furniture, isInvalid) {
       }
     }
   } else {
-    box(meshGroup, w, h, d, 0, h / 2, 0, col);
-    if (furniture.kind === 'appliance') {
+    const isAppliance = furniture.kind === 'appliance';
+    // Recess the body so the panel and handle remain visible inside the
+    // original depth envelope used for placement and collision checks.
+    box(meshGroup, w, h, isAppliance ? d * 0.96 : d,
+        0, h / 2, isAppliance ? -d * 0.02 : 0, col);
+    if (isAppliance) {
       box(meshGroup, w * 0.8, h * 0.65, d * 0.02,
           0, h * 0.45, d * 0.48, '#344343');
       box(meshGroup, w * 0.6, h * 0.04, d * 0.04,
