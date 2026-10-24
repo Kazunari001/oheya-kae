@@ -35,6 +35,19 @@ let wallGroup;
 let labels = [];
 let pickMeshes = [];
 let span = 6;
+let objectFilter = 'all';
+let inspectedImageIds = new Set();
+const detections = project.analysis?.detections ?? [];
+const isPlaced = (item) => [item.width, item.depth, item.height, item.y]
+    .every((value) => value != null);
+const isProvisional = (item, keys) => keys.some((key) =>
+  item?.evidence?.[key]?.status !== 'confirmed',
+);
+function visibleItem(item) {
+  const collection = project.objects?.some((entry) => entry.id === item.id)
+    ? 'objects' : 'furniture';
+  return objectFilter === 'all' || objectFilter === collection;
+}
 const center = new THREE.Vector3();
 function createElement(tag, text, className) {
   const node = document.createElement(tag);
@@ -46,20 +59,34 @@ function createElement(tag, text, className) {
   }
   return node;
 }
-function showDetail() {
-  const box = getElement('detail');
+function showDetail(box = getElement('detail')) {
   box.replaceChildren();
   const furniture = activeFurniture.find(
       (furniture) => furniture.id === selected,
   );
   if (!furniture) {
-    box.append(
-        createElement('b', '家具を選択'),
-        createElement(
-            'p',
-            '3Dの家具またはリストをクリックすると、属性・寸法・根拠を確認できます。',
-        ),
+    const detection = detections.find((entry) =>
+      `detection:${entry.id}` === selected,
     );
+    const opening = room?.openings.find((entry) => entry.id === selected);
+    if (detection || opening) {
+      box.append(createElement('b', detection ? `候補 ${detection.id}` :
+        `${opening.type === 'door' ? 'ドア' : '窓'} ${opening.id}`));
+      box.append(createElement('p', detection
+        ? `${detection.decision} · ${detection.reason}`
+        : `${formatMillimeters(opening.width)} × ` +
+            `${formatMillimeters(opening.height)} · 壁 ${opening.wall}`));
+      const details = detection ?? opening.evidence;
+      box.append(createElement('pre', JSON.stringify(details, null, 2)));
+    } else {
+      box.append(
+          createElement('b', '家具を選択'),
+          createElement(
+              'p',
+              '3Dの家具またはリストをクリックすると、属性・寸法・根拠を確認できます。',
+          ),
+      );
+    }
     return;
   }
   box.append(createElement('b', furniture.name));
@@ -109,6 +136,31 @@ function showDetail() {
         `親からの位置: ${furniture.local.x}, ${furniture.local.y ?? '不明'}, ` +
         `${furniture.local.z} mm`, 'evidence'));
   }
+  const children = activeFurniture.filter((item) =>
+    item.parentId === furniture.id,
+  );
+  for (const child of children) {
+    const button = createElement('button', `内容物: ${child.name}`);
+    button.onclick = () => select(child.id);
+    box.append(button);
+  }
+  const detection = detections.find((entry) => entry.targetId === furniture.id);
+  if (detection) {
+    box.append(createElement('p',
+        `検出 ${detection.id} / ${detection.model} · ${detection.reason}`));
+    box.append(createElement('p',
+        `有無 ${detection.presenceProbability ?? '不明'} / ` +
+        `枠 ${detection.boxConfidence ?? '不明'} / ` +
+        `種類 ${detection.categoryConfidence ?? '不明'}`));
+    box.append(createElement('p', '検出のconfidenceは実寸の確からしさを表しません。',
+        'evidence'));
+  }
+  if (!isPlaced(furniture)) {
+    box.append(createElement('p', '未配置: 寸法または設置高さが不明です。'));
+  }
+  if (furniture.kind === 'box') {
+    box.append(createElement('p', '形状: 外接箱による仮表示', 'evidence'));
+  }
   for (const note of furniture.uncertainties) {
     box.append(createElement('p', note, 'evidence'));
   }
@@ -122,14 +174,41 @@ function updatePanel() {
     `${room?.openings.length ?? 0}` +
     ' 開口部';
   getElement('area').textContent = room?.outline
-    ? (Math.abs(area(room.outline)) / 1e6).toFixed(1)
+    ? (Math.abs(area(room.outline)) / 1e6).toFixed(1) +
+    (isProvisional(room, ['outline']) ? '（仮）' : '')
     : '—';
   getElement('count').textContent = activeFurniture.length;
+  const displayed = activeFurniture.filter((item) =>
+    isPlaced(item) && visibleItem(item),
+  ).length;
+  getElement('object-counts').textContent =
+    `検出 ${detections.length || activeFurniture.length} · ` +
+    `3D表示 ${displayed} · ` +
+    `未配置 ${activeFurniture.filter((item) => !isPlaced(item)).length} · ` +
+    `画像のみ ${detections.filter((entry) => !entry.targetId).length}`;
   const invalidIds = new Set(
       report.issues.flatMap((i) => i.objectIds),
   );
   getElement('furniture-list').replaceChildren();
-  for (const furniture of activeFurniture) {
+  const ordered = [];
+  function appendChildren(parentId, depth) {
+    for (const item of activeFurniture.filter((entry) =>
+      (entry.parentId ?? null) === parentId,
+    )) {
+      ordered.push({item, depth});
+      appendChildren(item.id, depth + 1);
+    }
+  }
+  appendChildren(null, 0);
+  if (room) {
+    appendChildren(room.id, 0);
+  }
+  for (const {item: furniture, depth} of ordered) {
+    const collection = project.objects?.some((item) => item.id === furniture.id)
+      ? 'objects' : 'furniture';
+    if (objectFilter !== 'all' && objectFilter !== collection) {
+      continue;
+    }
     const button = createElement(
         'button',
         null,
@@ -137,19 +216,23 @@ function updatePanel() {
         (furniture.id === selected ? ' selected' : ''),
     );
     button.dataset.id = furniture.id;
+    button.style.paddingLeft = `${11 + Math.min(depth, 5) * 14}px`;
+    button.setAttribute('aria-pressed', String(furniture.id === selected));
     const swatch = createElement('span', null, 'swatch');
     swatch.style.background = furniture.color;
     button.append(swatch);
     const copy = createElement('span', null, 'item-copy');
     copy.append(
-        createElement('b', furniture.name),
+        createElement('b', `${depth ? '↳ ' : ''}${furniture.name}`),
         createElement(
             'small',
             `${formatMillimeters(furniture.width)}` +
             ' × ' +
             `${formatMillimeters(furniture.depth)}` +
             ' × ' +
-            `${formatMillimeters(furniture.height)}`,
+            `${formatMillimeters(furniture.height)}` +
+            (isProvisional(furniture, ['width', 'depth', 'height'])
+              ? '（仮寸法）' : '') + (isPlaced(furniture) ? '' : ' · 未配置'),
         ),
     );
     button.append(copy);
@@ -158,6 +241,26 @@ function updatePanel() {
     }
     button.addEventListener('click', () => select(furniture.id));
     getElement('furniture-list').append(button);
+  }
+  if (['all', 'openings'].includes(objectFilter)) {
+    for (const opening of room?.openings ?? []) {
+      const button = createElement('button',
+          `${opening.type === 'door' ? 'ドア' : '窓'} ${opening.id}`,
+          'furniture-button');
+      button.dataset.id = opening.id;
+      button.onclick = () => select(opening.id);
+      getElement('furniture-list').append(button);
+    }
+  }
+  if (['all', 'candidates'].includes(objectFilter)) {
+    for (const detection of detections.filter((entry) => !entry.targetId)) {
+      const button = createElement('button',
+          `画像上の候補 ${detection.id} · ${detection.decision}`,
+          'furniture-button');
+      button.dataset.id = `detection:${detection.id}`;
+      button.onclick = () => select(`detection:${detection.id}`);
+      getElement('furniture-list').append(button);
+    }
   }
   const validation = getElement('validation');
   validation.replaceChildren(
@@ -182,42 +285,68 @@ function updatePanel() {
     validation.append(issueList);
   }
   getElement('corrections').replaceChildren();
-  for (const c of report.corrections) {
-    getElement('corrections').append(
-        createElement(
-            'li',
-            `${c.path}` +
-            ' · ' +
-            `${STATUS_NAMES[c.status]}` +
-            `${c.note ? ' — ' + c.note : ''}`,
-        ),
-    );
+  for (const correction of report.correctionGroups ?? []) {
+    const row = createElement('li');
+    const details = createElement('details');
+    const name = activeFurniture.find((item) => item.id === correction.objectId)
+        ?.name ?? correction.objectId ?? '部屋';
+    details.append(createElement('summary', `${name} · ` +
+    `${correction.type === 'measurement' ? '仮寸法・配置' : '属性'} ` +
+    `${correction.entries.length}項目`));
+    for (const entry of correction.entries) {
+      details.append(createElement('p',
+          `${entry.path} · ${STATUS_NAMES[entry.status]} · ${entry.note}`));
+    }
+    row.append(details);
+    getElement('corrections').append(row);
+  }
+  for (const detection of report.detectionChecks ?? []) {
+    const row = createElement('li');
+    const button = createElement('button',
+        `検出の曖昧さ: ${detection.id} · ${detection.reason}`);
+    button.onclick = () => select(detection.targetId ??
+        `detection:${detection.id}`);
+    row.append(button);
+    getElement('corrections').append(row);
   }
   showDetail();
 }
 function select(id) {
+  const focused = document.activeElement?.closest('.furniture-button')
+      ?.dataset.id;
   selected = id;
   updatePanel();
+  if (focused) {
+    [...getElement('furniture-list').querySelectorAll('button')]
+        .find((button) => button.dataset.id === focused)
+        ?.focus({preventScroll: true});
+  }
   if (renderer) {
     drawScene();
   }
+  drawDetectionBoxes();
+  showDetail(getElement('image-selection'));
 }
 function sources() {
   const list = [
     ...(room?.images ?? []),
     ...project.furniture.flatMap((furniture) => furniture.images),
     ...(project.objects ?? []).flatMap((item) => item.images),
+    ...(project.analysis?.images ?? []),
   ];
   const seen = new Set();
+  let sourceIndex = 0;
   for (const source of list) {
-    if (seen.has(source.data)) {
+    const imageData = source.data;
+    if (seen.has(imageData)) {
       continue;
     }
-    seen.add(source.data);
+    seen.add(imageData);
+    const index = sourceIndex++;
     // Embedded JSON is untrusted here, even when CLI imports were validated.
     if (
-      typeof source.data !== 'string' ||
-      !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(source.data)
+      typeof imageData !== 'string' ||
+      !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageData)
     ) {
       getElement('sources').append(createElement(
           'span', `${source.name}（表示できない画像形式）`, 'evidence',
@@ -225,18 +354,83 @@ function sources() {
       continue;
     }
     const a = createElement('a');
-    a.href = source.data;
+    a.href = imageData;
     a.download = source.name;
     const img = createElement('img');
-    img.src = source.data;
+    img.src = imageData;
     img.alt = source.name;
     a.append(img, createElement('span', source.name));
     getElement('sources').append(a);
+    const inspect = createElement('button', `${source.name}を拡大・検出枠を確認`);
+    inspect.onclick = () => {
+      // Enforce the URL boundary at this asynchronous sink as well.
+      if (
+        typeof imageData !== 'string' ||
+        !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageData)
+      ) {
+        getElement('status').textContent = '元画像のURLが不正です。';
+        return;
+      }
+      inspectedImageIds = new Set(Object.keys(payload.sourceIndexes ?? {})
+          .filter((id) =>
+            payload.sourceIndexes[id] === index,
+          ));
+      getElement('inspection-image').src = imageData;
+      getElement('inspection-image').alt = source.name;
+      showDetail(getElement('image-selection'));
+      drawDetectionBoxes();
+      getElement('image-dialog').showModal();
+    };
+    getElement('sources').append(inspect);
   }
   if (!list.length) {
     getElement('sources').append(
         createElement('span', '画像なし', 'evidence'),
     );
+  }
+}
+
+function drawDetectionBoxes() {
+  const focused = document.activeElement?.dataset.detectionId;
+  getElement('image-boxes').replaceChildren();
+  for (const detection of detections.filter((entry) =>
+    inspectedImageIds.has(entry.imageId),
+  )) {
+    const target = activeFurniture.find((item) =>
+      item.id === detection.targetId,
+    );
+    const isOpening = room?.openings.some((item) =>
+      item.id === detection.targetId,
+    );
+    if (objectFilter !== 'all' && !(target && visibleItem(target)) &&
+        !(isOpening && objectFilter === 'openings') &&
+        !(!detection.targetId && objectFilter === 'candidates')) {
+      continue;
+    }
+    let [x, y, width, height] = detection.box;
+    const region = project.analysis.regions.find((entry) =>
+      entry.id === detection.regionId,
+    );
+    if (region) {
+      x = region.box[0] + x * region.box[2];
+      y = region.box[1] + y * region.box[3];
+      width *= region.box[2];
+      height *= region.box[3];
+    }
+    const id = detection.targetId ?? `detection:${detection.id}`;
+    const button = createElement('button', detection.id, 'detection-box');
+    button.dataset.detectionId = detection.id;
+    button.style.left = `${x * 100}%`;
+    button.style.top = `${y * 100}%`;
+    button.style.width = `${width * 100}%`;
+    button.style.height = `${height * 100}%`;
+    button.setAttribute('aria-label', `検出 ${detection.id}`);
+    button.setAttribute('aria-pressed', String(id === selected));
+    button.onclick = () => select(id);
+    getElement('image-boxes').append(button);
+    if (focused === detection.id) {
+      button.focus({preventScroll: true});
+    }
   }
 }
 /**
@@ -315,6 +509,7 @@ function floorMaterial() {
  */
 function makeFurniture(furniture, isInvalid) {
   if (
+    !visibleItem(furniture) ||
     [furniture.width, furniture.depth, furniture.height].some(
         (v) => v == null,
     ) || furniture.y == null
@@ -333,7 +528,8 @@ function makeFurniture(furniture, isInvalid) {
   const h = furniture.height / 1000;
   const col = isInvalid ? '#cb765c' : furniture.color;
   const openShelf = furniture.kind === 'shelf' && furniture.supports.length > 0;
-  if (openShelf) {
+  const openFrame = openShelf || furniture.kind === 'clothes_rack';
+  if (openFrame || ['books', 'screen', 'lamp'].includes(furniture.kind)) {
     for (const part of solidParts(furniture)) {
       const mesh = box(meshGroup, part.width / 1000, part.height / 1000,
           part.depth / 1000, part.x / 1000,
@@ -341,6 +537,19 @@ function makeFurniture(furniture, isInvalid) {
       mesh.userData.id = furniture.id;
       pickMeshes.push(mesh);
     }
+  } else if (furniture.kind === 'clock') {
+    const face = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
+        new THREE.MeshStandardMaterial({color: col}),
+    );
+    face.rotation.x = Math.PI / 2;
+    face.scale.set(w, d, h);
+    face.position.y = h / 2;
+    meshGroup.add(face);
+    box(meshGroup, w * 0.04, h * 0.28, d * 0.1,
+        0, h * 0.6, d * 0.46, '#283d37');
+    box(meshGroup, w * 0.25, h * 0.04, d * 0.1,
+        w * 0.1, h / 2, d * 0.46, '#283d37');
   } else if (['desk', 'table'].includes(furniture.kind)) {
     const thick = Math.min(0.06, h / 5);
     box(meshGroup, w, thick, d, 0, h - thick / 2, 0, col);
@@ -399,7 +608,17 @@ function makeFurniture(furniture, isInvalid) {
       }
     }
   } else {
-    box(meshGroup, w, h, d, 0, h / 2, 0, col);
+    const isAppliance = furniture.kind === 'appliance';
+    // Recess the body so the panel and handle remain visible inside the
+    // original depth envelope used for placement and collision checks.
+    box(meshGroup, w, h, isAppliance ? d * 0.96 : d,
+        0, h / 2, isAppliance ? -d * 0.02 : 0, col);
+    if (isAppliance) {
+      box(meshGroup, w * 0.8, h * 0.65, d * 0.02,
+          0, h * 0.45, d * 0.48, '#344343');
+      box(meshGroup, w * 0.6, h * 0.04, d * 0.04,
+          0, h * 0.83, d * 0.48, '#a5a8ad');
+    }
     if (['shelf', 'cabinet'].includes(furniture.kind)) {
       for (let j = 1; j < 4; j++) {
         box(
@@ -421,18 +640,19 @@ function makeFurniture(furniture, isInvalid) {
       new THREE.EdgesGeometry(bounds),
       new THREE.LineBasicMaterial({
         color:
-        selected === furniture.id
+        selected === furniture.id || selected === furniture.parentId
           ? '#224e3d'
           : isInvalid
             ? '#a84430'
             : '#6c7565',
         transparent: true,
-        opacity: selected === furniture.id || isInvalid ? 1 : 0.25,
+        opacity: selected === furniture.id || selected === furniture.parentId ||
+            isInvalid ? 1 : 0.25,
       }),
   );
   outline.position.y = h / 2;
   meshGroup.add(outline);
-  if (openShelf) {
+  if (openFrame) {
     bounds.dispose();
   } else {
     const hit = new THREE.Mesh(
@@ -444,17 +664,21 @@ function makeFurniture(furniture, isInvalid) {
     meshGroup.add(hit);
     pickMeshes.push(hit);
   }
-  label(
-      `${furniture.name}` +
-      ' · ' +
-      `${Math.round(furniture.width)}` +
-      ' × ' +
-      `${Math.round(furniture.depth)}`,
-      furniture.x / 1000,
-      furniture.y / 1000 + h + 0.12,
-      furniture.z / 1000,
-      'furniture',
-  );
+  if (!furniture.parentId || selected === furniture.id ||
+      selected === furniture.parentId) {
+    label(
+        `${furniture.name}` +
+        ' · ' +
+        `${Math.round(furniture.width)}` +
+        ' × ' +
+        `${Math.round(furniture.depth)}` +
+        (isProvisional(furniture, ['width', 'depth']) ? '（仮）' : ''),
+        furniture.x / 1000,
+        furniture.y / 1000 + h + 0.12,
+        furniture.z / 1000,
+        'furniture',
+    );
+  }
 }
 /**
  * Release generated geometry, textures and materials before replacing a group.
@@ -587,13 +811,17 @@ function drawScene() {
       );
       group.add(edgeLine);
       label(
-          `${Math.round(length * 1000).toLocaleString()} mm`,
+          `${Math.round(length * 1000).toLocaleString()} mm` +
+          (isProvisional(room, ['outline']) ? '（仮）' : ''),
           (a[0] + b[0]) / 2000,
           0.035,
           (a[1] + b[1]) / 2000,
       );
     }
     for (const o of room.openings) {
+      if (!['all', 'openings'].includes(objectFilter)) {
+        continue;
+      }
       const openingShape = openingGeometry(room, o);
       const w = o.width / 1000;
       const openingGroup = new THREE.Group();
@@ -607,6 +835,11 @@ function drawScene() {
           openingShape.end[0] - openingShape.start[0],
       );
       group.add(openingGroup);
+      const hit = box(openingGroup, w, o.height / 1000, 0.04,
+          0, (o.sill + o.height / 2) / 1000, 0, '#ffffff', true);
+      hit.material.visible = false;
+      hit.userData.id = o.id;
+      pickMeshes.push(hit);
       if (o.type === 'window') {
         box(
             openingGroup,
@@ -664,7 +897,7 @@ function drawScene() {
           `${o.type === 'door' ? 'ドア' : '窓'}` +
           ' ' +
           `${Math.round(o.width)}` +
-          ' mm',
+          ' mm' + (isProvisional(o, ['width']) ? '（仮）' : ''),
           openingGroup.position.x,
           0.08,
           openingGroup.position.z,
@@ -811,6 +1044,7 @@ function init() {
     requestAnimationFrame(frame);
     controls.update();
     renderer.render(scene, camera);
+    const occupied = [];
     for (const label of labels) {
       const projected = label.position.clone().project(camera);
       const visible = label.el.classList.contains('furniture')
@@ -828,6 +1062,19 @@ function init() {
       const top = ((-projected.y + 1) / 2) * renderer.domElement.clientHeight;
       label.el.style.left = `${left}px`;
       label.el.style.top = `${top}px`;
+      if (label.el.style.display !== 'none' &&
+          label.el.classList.contains('furniture')) {
+        const bounds = label.el.getBoundingClientRect();
+        if (occupied.some((other) => bounds.left < other.right &&
+            bounds.right > other.left && bounds.top < other.bottom &&
+            bounds.bottom > other.top)) {
+          label.el.style.display = 'none';
+        } else {
+          occupied.push(bounds);
+        }
+      } else if (label.el.style.display !== 'none') {
+        occupied.push(label.el.getBoundingClientRect());
+      }
     }
   }
   frame();
@@ -842,7 +1089,9 @@ function init() {
       return getElement('proposal').value;
     },
     get meshCount() {
-      return new Set(pickMeshes.map((mesh) => mesh.userData.id)).size;
+      return new Set(pickMeshes.map((mesh) => mesh.userData.id).filter((id) =>
+        activeFurniture.some((item) => item.id === id),
+      )).size;
     },
     get worldPositions() {
       return Object.fromEntries(group.children
@@ -897,6 +1146,18 @@ function init() {
 }
 updatePanel();
 sources();
+getElement('object-filter').onchange = (event) => {
+  objectFilter = event.target.value;
+  updatePanel();
+  drawDetectionBoxes();
+  if (renderer) {
+    drawScene();
+  }
+};
+getElement('close-image').onclick = () => getElement('image-dialog').close();
+getElement('image-zoom').oninput = (event) => {
+  getElement('image-stage').style.width = `${event.target.value}%`;
+};
 for (const v of payload.proposals) {
   const o = createElement('option', v.name);
   o.value = v.id;
@@ -907,22 +1168,28 @@ getElement('proposal').addEventListener('change', () => {
       (v) => v.id === getElement('proposal').value,
   );
   const furniture = proposal
-    ? project.furniture.map((furniture) => ({
-      ...furniture,
-      ...proposal.placements.find((v) => v.id === furniture.id),
-      evidence: {
-        ...furniture.evidence,
-        ...Object.fromEntries(
-            ['x', 'z', 'rotation'].map((k) => [
-              k,
-              {
-                status: 'estimated',
-                note: '配置案の位置・回転。実位置は未確認。',
-              },
-            ]),
-        ),
-      },
-    }))
+    ? project.furniture.map((furniture) => {
+      const placement = proposal.placements.find((v) => v.id === furniture.id);
+      if (!placement) {
+        return furniture;
+      }
+      return {
+        ...furniture,
+        ...placement,
+        evidence: {
+          ...furniture.evidence,
+          ...Object.fromEntries(
+              ['x', 'z', 'rotation'].map((k) => [
+                k,
+                {
+                  status: 'estimated',
+                  note: '配置案の位置・回転。実位置は未確認。',
+                },
+              ]),
+          ),
+        },
+      };
+    })
     : project.furniture;
   activeFurniture = resolveItems({...project, furniture});
   report = proposal?.validation ?? payload.validation;

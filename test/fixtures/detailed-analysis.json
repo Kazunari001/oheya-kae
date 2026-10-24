@@ -1,0 +1,629 @@
+{
+  "room": {
+    "id": "room",
+    "name": "支持関係の検証用の部屋",
+    "outline": [
+      [
+        0,
+        0
+      ],
+      [
+        4000,
+        0
+      ],
+      [
+        4000,
+        5000
+      ],
+      [
+        0,
+        5000
+      ]
+    ],
+    "height": 2400,
+    "openings": [
+      {
+        "id": "door",
+        "type": "door",
+        "wall": 2,
+        "offset": 1500,
+        "width": 800,
+        "height": 2000
+      }
+    ]
+  },
+  "furniture": [
+    {
+      "id": "shelf",
+      "name": "開放棚",
+      "kind": "shelf",
+      "category": "metal_shelf",
+      "sourceId": "detected-shelf",
+      "width": 1200,
+      "depth": 500,
+      "height": 1900,
+      "x": 900,
+      "z": 1000,
+      "rotation": 90,
+      "supports": [
+        {
+          "id": "lower",
+          "y": 100,
+          "width": 1200,
+          "depth": 500
+        },
+        {
+          "id": "middle",
+          "y": 900,
+          "width": 1200,
+          "depth": 500
+        },
+        {
+          "id": "upper",
+          "y": 1800,
+          "width": 1200,
+          "depth": 500
+        }
+      ]
+    },
+    {
+      "id": "stand",
+      "name": "テレビ台",
+      "kind": "cabinet",
+      "width": 1400,
+      "depth": 450,
+      "height": 400,
+      "x": 1000,
+      "z": 3200,
+      "rotation": 90
+    },
+    {
+      "id": "desk",
+      "name": "デスク",
+      "kind": "desk",
+      "width": 1400,
+      "depth": 650,
+      "height": 730,
+      "x": 3000,
+      "z": 1000,
+      "rotation": 0
+    },
+    {
+      "id": "rack",
+      "name": "衣類ラック",
+      "kind": "clothes_rack",
+      "width": 900,
+      "depth": 500,
+      "height": 1600,
+      "x": 3000,
+      "z": 3000,
+      "rotation": 0
+    }
+  ],
+  "objects": [
+    {
+      "id": "books",
+      "name": "下段の本",
+      "kind": "books",
+      "category": "book_group",
+      "sourceId": "detected-books",
+      "width": 500,
+      "depth": 300,
+      "height": 300,
+      "parentId": "shelf",
+      "attachment": "inside",
+      "surfaceId": "lower",
+      "x": 0,
+      "y": 100,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "id": "oven",
+      "name": "中段のオーブン",
+      "kind": "appliance",
+      "category": "appliance",
+      "width": 500,
+      "depth": 350,
+      "height": 400,
+      "parentId": "shelf",
+      "attachment": "inside",
+      "surfaceId": "middle",
+      "x": 0,
+      "y": 900,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "id": "tv",
+      "name": "台上のテレビ",
+      "kind": "screen",
+      "category": "television",
+      "width": 1000,
+      "depth": 120,
+      "height": 650,
+      "parentId": "stand",
+      "attachment": "on",
+      "x": 0,
+      "y": 400,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "id": "clock",
+      "name": "壁の時計",
+      "kind": "clock",
+      "category": "clock",
+      "width": 300,
+      "depth": 40,
+      "height": 300,
+      "parentId": "room",
+      "attachment": "wall",
+      "wall": 1,
+      "x": 3980,
+      "y": 1500,
+      "z": 2300,
+      "rotation": 90
+    },
+    {
+      "id": "monitor",
+      "name": "机上のモニター",
+      "kind": "screen",
+      "category": "monitor",
+      "width": 500,
+      "depth": 100,
+      "height": 400,
+      "parentId": "desk",
+      "attachment": "on",
+      "x": 0,
+      "y": 730,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "id": "unlocated",
+      "name": "寸法不明の照明",
+      "kind": "lamp",
+      "width": null,
+      "depth": null,
+      "height": null,
+      "y": null
+    }
+  ],
+  "analysis": {
+    "sources": [
+      {
+        "id": "photo",
+        "sha256": "d811b823034cd379c8da2986a94b6a6e340249789965b3a87d5aeae2cdbacb86"
+      }
+    ],
+    "regions": [
+      {
+        "id": "shelf-crop",
+        "imageId": "photo",
+        "box": [
+          0.1,
+          0.2,
+          0.3,
+          0.6
+        ]
+      }
+    ],
+    "detections": [
+      {
+        "id": "shelf",
+        "imageId": "photo",
+        "box": [
+          0.1,
+          0.1,
+          0.8,
+          0.8
+        ],
+        "regionId": "shelf-crop",
+        "targetId": "shelf",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "stand",
+        "imageId": "photo",
+        "box": [
+          0.6,
+          0.1,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "stand",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "desk",
+        "imageId": "photo",
+        "box": [
+          0.7,
+          0.1,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "desk",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "rack",
+        "imageId": "photo",
+        "box": [
+          0.8,
+          0.1,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "rack",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "books",
+        "imageId": "photo",
+        "box": [
+          0.5,
+          0.2,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "books",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "oven",
+        "imageId": "photo",
+        "box": [
+          0.6,
+          0.2,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "oven",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "tv",
+        "imageId": "photo",
+        "box": [
+          0.7,
+          0.2,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "tv",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "clock",
+        "imageId": "photo",
+        "box": [
+          0.8,
+          0.2,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "clock",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.3,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "monitor",
+        "imageId": "photo",
+        "box": [
+          0.5,
+          0.30000000000000004,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "monitor",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "unlocated",
+        "imageId": "photo",
+        "box": [
+          0.6,
+          0.30000000000000004,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "unlocated",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "door",
+        "imageId": "photo",
+        "box": [
+          0.7,
+          0.30000000000000004,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": "door",
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "accepted",
+        "reason": "回帰テスト用の合成データ"
+      },
+      {
+        "id": "candidate-11",
+        "imageId": "photo",
+        "box": [
+          0.8,
+          0.30000000000000004,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-12",
+        "imageId": "photo",
+        "box": [
+          0.5,
+          0.4,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-13",
+        "imageId": "photo",
+        "box": [
+          0.6,
+          0.4,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-14",
+        "imageId": "photo",
+        "box": [
+          0.7,
+          0.4,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-15",
+        "imageId": "photo",
+        "box": [
+          0.8,
+          0.4,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-16",
+        "imageId": "photo",
+        "box": [
+          0.5,
+          0.5,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-17",
+        "imageId": "photo",
+        "box": [
+          0.6,
+          0.5,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-18",
+        "imageId": "photo",
+        "box": [
+          0.7,
+          0.5,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-19",
+        "imageId": "photo",
+        "box": [
+          0.8,
+          0.5,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-20",
+        "imageId": "photo",
+        "box": [
+          0.5,
+          0.6,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-21",
+        "imageId": "photo",
+        "box": [
+          0.6,
+          0.6,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "pending",
+        "reason": "画像上だけの合成候補"
+      },
+      {
+        "id": "candidate-22",
+        "imageId": "photo",
+        "box": [
+          0.7,
+          0.6,
+          0.08,
+          0.08
+        ],
+        "regionId": null,
+        "targetId": null,
+        "model": "synthetic-fixture",
+        "presenceProbability": 0.9,
+        "boxConfidence": 0.9,
+        "categoryConfidence": 0.85,
+        "decision": "excluded",
+        "reason": "画像上だけの合成候補"
+      }
+    ]
+  }
+}

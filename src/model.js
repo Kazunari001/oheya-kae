@@ -1,7 +1,8 @@
 import {randomUUID} from 'node:crypto';
 import {requireValue} from './errors.js';
 import {simplePolygon, openingGeometry, footprint, contained} from './geometry.js';
-import {resolveItems} from './scene.js';
+import {resolveItems, movableRoots} from './scene.js';
+import {normalizeAnalysis, validateAnalysisLinks} from './detections.js';
 
 export const STATUSES = [
   'estimated',
@@ -18,6 +19,12 @@ export const KINDS = [
   'bed',
   'shelf',
   'cabinet',
+  'clothes_rack',
+  'clock',
+  'books',
+  'appliance',
+  'screen',
+  'lamp',
 ];
 export const ATTACHMENTS = ['floor', 'on', 'inside', 'wall', 'part'];
 /**
@@ -100,7 +107,12 @@ function notes(value = []) {
   );
   return value.map((n) => string(n, 'uncertainty'));
 }
-function images(value = []) {
+/**
+ * Validate embedded source images at both scene and provenance boundaries.
+ * @param {!Array<!Object>} value Image names and raster data URLs.
+ * @return {!Array<!Object>} Normalized embedded images.
+ */
+export function normalizeImages(value = []) {
   requireValue(Array.isArray(value), 'images must be an array');
   return value.map((i) => {
     object(i, 'image');
@@ -144,6 +156,44 @@ function supportSurfaces(value, furniture) {
     return surface;
   });
 }
+
+function normalizeHistory(history, trusted) {
+  requireValue(Array.isArray(history), 'Evidence history must be an array');
+  return history.map((entry) => {
+    object(entry, 'history entry');
+    requireValue(STATUSES.includes(entry.status), 'Invalid history status');
+    return {
+      value: structuredClone(entry.value ?? null),
+      status: !trusted && entry.status === 'confirmed'
+        ? 'estimated' : entry.status,
+      note: typeof entry.note === 'string' ? entry.note : '',
+    };
+  });
+}
+
+/**
+ * Record a revision without losing the original unknown or model value.
+ * @param {!Object} next Updated normalized item.
+ * @param {!Object} previous Item before the edit.
+ * @param {!Array<string>} keys Explicitly changed fields.
+ * @param {string} status New evidence status.
+ * @param {string} note Reason for the revision.
+ */
+export function revise(next, previous, keys, status, note) {
+  requireValue(STATUSES.includes(status), 'Invalid revision status');
+  for (const key of keys) {
+    const old = previous.evidence[key] ?? {status: 'unknown', note: ''};
+    next.evidence[key] = {
+      status: next[key] == null ? 'unknown' : status,
+      note,
+      history: [...(old.history ?? []), {
+        value: structuredClone(previous[key] ?? null),
+        status: old.status,
+        note: old.note,
+      }],
+    };
+  }
+}
 /**
  * Attach provenance while preventing imported data from claiming confirmation.
  * @param {!Object} fields Field values to describe.
@@ -181,6 +231,9 @@ function evidenceFor(
         typeof fieldEvidence.note === 'string'
           ? fieldEvidence.note
           : '',
+      ...(fieldEvidence.history !== undefined ? {
+        history: normalizeHistory(fieldEvidence.history, trusted),
+      } : {}),
     };
   }
   return result;
@@ -219,7 +272,7 @@ export function normalizeFurniture(
       ? (raw.parentId ? null : 0)
       : (raw.y === null ? null : number(raw.y, 'y')),
     frameThickness: number(raw.frameThickness ?? 20, 'frameThickness', 1, 1e6),
-    images: images(raw.images),
+    images: normalizeImages(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
   requireValue(
@@ -277,7 +330,8 @@ export function normalizeFurniture(
     'wall', 'y', 'supports', 'frameThickness',
   ].filter((key) =>
     (!['sourceId', 'parentId', 'surfaceId', 'wall'].includes(key) ||
-        furniture[key] != null) &&
+        furniture[key] != null ||
+        Object.hasOwn(raw.evidence ?? {}, key)) &&
         ((key === 'y' && furniture.y === null) ||
             Object.hasOwn(raw.evidence ?? {}, key) ||
             ((!trusted || raw.evidence === undefined) &&
@@ -346,7 +400,7 @@ export function normalizeRoom(
     outline,
     height: dimension(raw.height, 'height'),
     openings: [],
-    images: images(raw.images),
+    images: normalizeImages(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
   requireValue(
@@ -501,6 +555,8 @@ export function normalizeProject(raw) {
       normalizeFurniture(item, {trusted: true}),
     ),
     proposals: [],
+    ...(raw.analysis === undefined
+      ? {} : {analysis: normalizeAnalysis(raw.analysis)}),
   };
   requireValue(
       new Set(project.furniture.map((furniture) => furniture.id))
@@ -508,6 +564,7 @@ export function normalizeProject(raw) {
       'Duplicate furniture IDs',
   );
   validateRelationships(project);
+  validateAnalysisLinks(project);
   project.proposals = (raw.proposals ?? []).map((value) => {
     object(value, 'proposal');
     requireValue(
@@ -518,7 +575,7 @@ export function normalizeProject(raw) {
     const placements = value.placements.map((furniture) => {
       object(furniture, 'placement');
       requireValue(
-          project.furniture.some(
+          movableRoots(project).some(
               (item) => item.id === furniture.id,
           ) && !ids.has(furniture.id),
           'Invalid or duplicate proposal furniture ID',
@@ -532,8 +589,8 @@ export function normalizeProject(raw) {
       };
     });
     requireValue(
-        ids.size === project.furniture.length,
-        'A proposal must place every furniture item',
+        ids.size === movableRoots(project).length,
+        'A proposal must place every movable root',
     );
     return {
       id: identifier(value.id),
@@ -611,6 +668,10 @@ export function corrections(project) {
     for (const [field, fieldEvidence] of Object.entries(
         item.evidence,
     )) {
+      if (['parentId', 'surfaceId', 'wall', 'sourceId'].includes(field) &&
+          item[field] == null) {
+        continue;
+      }
       if (fieldEvidence.status !== 'confirmed') {
         result.push({
           objectId: item.id,
@@ -657,14 +718,6 @@ export function corrections(project) {
  */
 export function confirmed(item, keys) {
   for (const key of keys) {
-    if (['parentId', 'surfaceId', 'wall', 'sourceId'].includes(key) &&
-        item[key] == null) {
-      delete item.evidence[key];
-      continue;
-    }
-    item.evidence[key] = {
-      status: item[key] == null ? 'unknown' : 'confirmed',
-      note: 'CLIで入力・確認済み。',
-    };
+    revise(item, item, [key], 'confirmed', 'CLIで入力・確認済み。');
   }
 }

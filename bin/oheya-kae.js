@@ -3,7 +3,9 @@ import {Command, InvalidArgumentError} from 'commander';
 import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {AppError, requireValue} from '../src/errors.js';
-import {normalizeRoom, normalizeFurniture, corrections, confirmed, number, object} from '../src/model.js';
+import {normalizeRoom, normalizeFurniture, corrections, confirmed, revise, number, object, KINDS} from '../src/model.js';
+import {importAnalysis, unlinkDetection} from '../src/detections.js';
+import {convertDetectionReport} from '../src/detection-report.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
@@ -95,7 +97,7 @@ function furnitureOptions(command) {
       .option('--name <name>')
       .option(
           '--kind <kind>',
-          'box|desk|table|chair|sofa|bed|shelf|cabinet',
+          KINDS.join('|'),
       )
       .option('--color <hex>', '#RRGGBB')
       .option('--x <mm>', 'Footprint center X', numeric)
@@ -130,7 +132,7 @@ function importOptions(command) {
  */
 async function importData(kind, options) {
   const images = await readImages(options.image);
-  const data = options.analysis
+  let data = options.analysis
     ? await readJSON(options.analysis)
     : null;
   if (options.analysis) {
@@ -158,6 +160,12 @@ async function importData(kind, options) {
       requireValue(!Object.hasOwn(data, other),
           `Expected ${kind} analysis, not ${other} analysis`);
     }
+  }
+  if (options.detections) {
+    data = convertDetectionReport(data, await readJSON(options.detections),
+        options.response ? await readJSON(options.response) : null);
+  } else {
+    requireValue(!options.response, '--response requires --detections');
   }
   return {images, data};
 }
@@ -201,6 +209,23 @@ function explicitConfirm(options, keys) {
     );
   }
   confirmed(options, keys);
+}
+
+function revisionOptions(command) {
+  return command
+      .option('--status <status>', 'confirmed|estimated|image|unknown',
+          'confirmed')
+      .option('--note <text>', 'Basis or assumption for the updated values');
+}
+
+function recordUpdate(next, previous, keys, options) {
+  requireValue(options.status === 'confirmed' ||
+      typeof options.note === 'string' && options.note.trim().length > 0,
+  'Estimated updates require --note with their basis or assumption');
+  requireValue(options.status === 'confirmed' || !options.confirm?.length,
+      'Use a separate --status confirmed update to confirm fields');
+  revise(next, previous, keys, options.status,
+      options.note ?? 'CLIで入力・確認済み。');
 }
 
 cli
@@ -277,12 +302,15 @@ geometryOptions(room.command('create'))
     });
 importOptions(room.command('import'))
     .option('--replace', 'Replace existing room')
+    .option('--merge', 'Merge analysis, preserving confirmed fields and IDs')
+    .option('--detections <json>', 'Local detection report JSON')
+    .option('--response <json>', 'Original local model response JSON')
     .action(async (options) => {
     // Check conflicts before reading the source images and analysis JSON.
       const current = await load(projectPath(), true);
       requireValue(
-          !current.room || options.replace,
-          'Room already exists; use --replace',
+          !current.room || options.replace || options.merge,
+          'Room already exists; use --replace or --merge',
       );
       const {images, data} = await importData('room', options);
       const raw = data?.room ??
@@ -292,30 +320,25 @@ importOptions(room.command('import'))
           '実寸で部屋形状・寸法・開口部を補正してください。',
         ],
       };
-      const currentRoom = normalizeRoom({...raw, images});
-      const furniture = (data?.furniture ?? []).map((item) =>
-        normalizeFurniture({...item, images}),
-      );
-      const objects = (data?.objects ?? []).map((item) =>
-        normalizeFurniture({...item, images}),
-      );
       await changed((project) => {
         requireValue(
-            !project.room || options.replace,
-            'Room already exists; use --replace',
+            !project.room || options.replace || options.merge,
+            'Room already exists; use --replace or --merge',
         );
-        project.room = currentRoom;
-        project.furniture.push(...furniture);
-        project.objects.push(...objects);
+        if (options.replace && !options.merge) {
+          project.room = null;
+        }
+        const currentRoom = importAnalysis(project,
+            data ?? {room: raw}, images, 'room');
         return {
           objectId: currentRoom.id,
           room: currentRoom,
-          addedFurniture: furniture,
-          addedObjects: objects,
+          addedFurniture: project.furniture,
+          addedObjects: project.objects,
         };
       });
     });
-geometryOptions(room.command('update'))
+revisionOptions(geometryOptions(room.command('update')))
     .option('--name <name>')
     .option('--outline <json>')
     .option(
@@ -374,21 +397,27 @@ geometryOptions(room.command('update'))
             {...old, ...patch},
             {trusted: true},
         );
-        confirmed(
+        recordUpdate(
             project.room,
+            old,
             Object.keys(patch).filter((k) =>
               Object.hasOwn(project.room.evidence, k),
             ),
+            options,
         );
         if (patch.openings) {
           for (let i = 0; i < patch.openings.length; i++) {
-            confirmed(
+            recordUpdate(
                 project.room.openings[i],
+                old.openings.find((item) =>
+                  item.id === project.room.openings[i].id,
+                ) ?? {evidence: {}},
                 Object.keys(patch.openings[i]).filter(
                     (k) =>
                       patch.openings[i][k] != null &&
                       Object.hasOwn(project.room.openings[i].evidence, k),
                 ),
+                options,
             );
           }
         }
@@ -500,7 +529,7 @@ openingOptions(opening.command('add'))
         return {objectId: added.id, opening: added};
       }),
     );
-openingOptions(opening.command('update'))
+revisionOptions(openingOptions(opening.command('update')))
     .requiredOption('--id <id>')
     .option('--confirm <field>', 'Mark checked field', repeat, [])
     .action(async (options) =>
@@ -535,7 +564,7 @@ openingOptions(opening.command('update'))
         const updated = project.room.openings.find(
             (v) => v.id === options.id,
         );
-        confirmed(updated, Object.keys(patch));
+        recordUpdate(updated, old, Object.keys(patch), options);
         explicitConfirm(updated, options.confirm);
         return {objectId: options.id, opening: updated};
       }),
@@ -553,6 +582,7 @@ opening
         currentRoom.openings = currentRoom.openings.filter(
             (opening) => opening.id !== options.id,
         );
+        unlinkDetection(project, options.id);
         confirmed(currentRoom, ['openings']);
         return {objectId: options.id, removed: true};
       }),
@@ -585,14 +615,13 @@ importOptions(furniture.command('import')).action(
           '画像からの属性・寸法・形状は未解析です。解析JSONまたは実寸を入力してください。',
         ],
       };
-      const item = normalizeFurniture({...raw, images});
       await changed((project) => {
-        project.furniture.push(item);
+        const item = importAnalysis(project, data ?? raw, images, 'furniture');
         return {objectId: item.id, furniture: item};
       });
     },
 );
-furnitureOptions(furniture.command('update'))
+revisionOptions(furnitureOptions(furniture.command('update')))
     .requiredOption('--id <id>')
     .option('--data <json>', 'Partial attributes/uncertainties')
     .option('--confirm <field>', 'Mark checked field', repeat, [])
@@ -615,19 +644,20 @@ furnitureOptions(furniture.command('update'))
             {...item, ...patch},
             {trusted: true},
         );
-        confirmed(
+        recordUpdate(
             next,
+            item,
             Object.keys(patch).filter((k) =>
               FURNITURE_FIELDS.includes(k),
             ),
+            options,
         );
         explicitConfirm(next, options.confirm);
         project.furniture[project.furniture.indexOf(item)] = next;
         return {objectId: next.id, furniture: next};
       });
     });
-furniture
-    .command('move')
+revisionOptions(furniture.command('move'))
     .requiredOption('--id <id>')
     .option('--x <mm>', 'Center X', numeric)
     .option('--y <mm>', 'Bottom elevation', numeric)
@@ -641,8 +671,9 @@ furniture
             Object.keys(patch).length,
             'Specify x, y, z or rotation',
         );
+        const previous = structuredClone(item);
         Object.assign(item, patch);
-        confirmed(item, Object.keys(patch));
+        recordUpdate(item, previous, Object.keys(patch), options);
         return {objectId: item.id, furniture: item};
       }),
     );
@@ -690,6 +721,7 @@ furniture
         project.furniture = project.furniture.filter(
             (item) => item.id !== options.id,
         );
+        unlinkDetection(project, options.id);
         return {objectId: options.id, removed: true};
       }),
     );
@@ -712,13 +744,12 @@ furnitureOptions(objects.command('add'))
     });
 importOptions(objects.command('import')).action(async (options) => {
   const {images, data} = await importData('object', options);
-  const item = normalizeFurniture({...data?.object ?? data ?? {}, images});
   await changed((project) => {
-    project.objects.push(item);
+    const item = importAnalysis(project, data ?? {}, images, 'object');
     return {objectId: item.id, object: item};
   });
 });
-furnitureOptions(objects.command('update'))
+revisionOptions(furnitureOptions(objects.command('update')))
     .requiredOption('--id <id>')
     .option('--data <json>', 'Partial object attributes')
     .option('--confirm <field>', 'Mark checked field', repeat, [])
@@ -735,9 +766,10 @@ furnitureOptions(objects.command('update'))
         requireValue(index >= 0, `Object not found: ${options.id}`);
         const next = normalizeFurniture({...project.objects[index], ...patch},
             {trusted: true});
-        confirmed(next, Object.keys(patch).filter((key) =>
-          FURNITURE_FIELDS.includes(key),
-        ));
+        recordUpdate(next, project.objects[index],
+            Object.keys(patch).filter((key) =>
+              FURNITURE_FIELDS.includes(key),
+            ), options);
         explicitConfirm(next, options.confirm);
         project.objects[index] = next;
         return {objectId: next.id, object: next};
@@ -749,6 +781,7 @@ objects.command('remove')
       const index = project.objects.findIndex((item) => item.id === options.id);
       requireValue(index >= 0, `Object not found: ${options.id}`);
       project.objects.splice(index, 1);
+      unlinkDetection(project, options.id);
       return {objectId: options.id, removed: true};
     }));
 
@@ -825,14 +858,6 @@ layout
             report.issues,
         );
         project.furniture = next.furniture;
-        for (const item of project.furniture) {
-          for (const k of ['x', 'z', 'rotation']) {
-            item.evidence[k] = {
-              status: 'estimated',
-              note: '配置案の適用。実位置は未確認。',
-            };
-          }
-        }
         return {objectId: v.id, applied: true};
       }),
     );

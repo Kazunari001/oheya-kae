@@ -35,11 +35,13 @@ const [packed] = JSON.parse(npm([
 const files = new Set(packed.files.map((file) => file.path));
 for (const required of [
   'package.json', 'LICENSE', 'README.md', 'bin/oheya-kae.js',
-  'src/export.js', 'viewer/index.html', 'viewer/viewer.css',
+  'src/export.js', 'src/detection-report.js',
+  'viewer/index.html', 'viewer/viewer.css',
   'dist/viewer.js', 'dist/THREE-LICENSE.txt',
 ]) {
   assert.ok(files.has(required), `Package is missing ${required}`);
 }
+assert.ok(!files.has('src/jev.js'), 'Package contains the obsolete converter');
 for (const file of files) {
   assert.ok(
       !/^(?:output|node_modules|test|scripts|\.github)\//.test(file),
