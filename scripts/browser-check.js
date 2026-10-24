@@ -134,6 +134,28 @@ try {
     );
   }
   await page.locator('#proposal').selectOption('current');
+  const objectLabels = page.locator('#labels .furniture:visible');
+  const dimensionLabels = page.locator(
+      '#labels .dimension:not(.furniture):visible',
+  );
+  await page.getByRole('button', {name: '名称', exact: true}).click();
+  assert.equal(
+      await page.locator('#names').getAttribute('aria-pressed'), 'false',
+  );
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#labels .furniture')]
+        .every((label) => label.style.display === 'none'),
+  );
+  assert.ok(await dimensionLabels.count() > 0);
+  await page.getByRole('button', {name: '間取り', exact: true}).click();
+  await page.locator('#proposal').selectOption(options[1]);
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#labels .furniture')]
+        .every((label) => label.style.display === 'none'),
+  );
+  assert.equal(await objectLabels.count(), 0);
+  await page.locator('#proposal').selectOption('current');
+  await page.getByRole('button', {name: '3Dビュー', exact: true}).click();
   await page
       .getByRole('button', {name: '寸法', exact: true})
       .click();
@@ -141,6 +163,15 @@ try {
       await page.locator('#dimensions').getAttribute('aria-pressed'),
       'false',
   );
+  await page.getByRole('button', {name: '名称', exact: true}).click();
+  assert.equal(
+      await page.locator('#names').getAttribute('aria-pressed'), 'true',
+  );
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#labels .furniture')]
+        .some((label) => label.style.display === 'block'),
+  );
+  assert.equal(await dimensionLabels.count(), 0);
   await page
       .getByRole('button', {name: '寸法', exact: true})
       .click();
@@ -501,7 +532,7 @@ try {
   await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 10);
   console.log(
       'Browser checks passed: file://, offline, 3D, ' +
-      'selection, orbit, top view, dimensions, proposal ' +
+      'selection, orbit, top view, names, dimensions, proposal ' +
       'comparison, mobile, support surfaces, elevated objects, parent moves, ' +
       '23 detections, crop boxes, image selection, filters and keyboard.',
   );
