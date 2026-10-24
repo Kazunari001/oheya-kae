@@ -858,14 +858,6 @@ layout
             report.issues,
         );
         project.furniture = next.furniture;
-        for (const item of project.furniture) {
-          for (const k of ['x', 'z', 'rotation']) {
-            item.evidence[k] = {
-              status: 'estimated',
-              note: '配置案の適用。実位置は未確認。',
-            };
-          }
-        }
         return {objectId: v.id, applied: true};
       }),
     );

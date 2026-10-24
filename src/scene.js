@@ -60,6 +60,17 @@ export function transformPoint(parent, point) {
 }
 
 /**
+ * Select floor furniture roots; attached parts and wall items remain fixed.
+ * @param {!Object} project Normalized scene.
+ * @return {!Array<!Object>} Furniture eligible for grid search.
+ */
+export function movableRoots(project) {
+  return project.furniture.filter((item) =>
+    !item.parentId && item.attachment === 'floor' && item.y === 0,
+  );
+}
+
+/**
  * Return solid local boxes, distinguishing an open shelf from its envelope.
  * Supports describe board TOP elevations; each board occupies y-thickness..y.
  * @param {!Object} item Dimensions in mm, optional supports and frameThickness.

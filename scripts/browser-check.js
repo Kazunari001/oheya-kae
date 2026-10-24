@@ -6,6 +6,8 @@ import {readFile} from 'node:fs/promises';
 import {load} from '../src/store.js';
 import {normalizeProject, emptyProject} from '../src/model.js';
 import {importAnalysis} from '../src/detections.js';
+import {propose} from '../src/proposals.js';
+import {resolveItems} from '../src/scene.js';
 import {exportHTML} from '../src/export.js';
 import * as THREE from 'three';
 
@@ -355,9 +357,16 @@ try {
       'test/fixtures/detailed-analysis.json', 'utf8',
   )), withImages.room.images, 'room');
   const normalized = normalizeProject(detailed);
+  normalized.proposals = propose(normalized, {
+    count: 1, step: 500, clearance: 0,
+  });
   await exportHTML(normalized, 'output/detailed-demo.html');
   await page.goto(spatialUrl('detailed-demo.html'));
   await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 9);
+  assert.match(await page.locator('#object-counts').innerText(),
+      /検出 23.*3D表示 9.*未配置 1.*画像のみ 12/);
+  assert.match(await page.locator('#area').innerText(), /仮/);
+  assert.match(await page.locator('#corrections').innerText(), /検出の曖昧さ/);
   await page.locator('.furniture-button[data-id="shelf"]').click();
   assert.match(await page.locator('#detail').innerText(), /内容物: 下段の本/);
   await page.locator('#sources button').click();
@@ -406,6 +415,22 @@ try {
   }).click();
   assert.match(await page.locator('#detail').innerText(), /excluded/);
   await page.locator('#object-filter').selectOption('all');
+  await page.locator('#proposal').selectOption(normalized.proposals[0].id);
+  positions = await page.evaluate(() => window.oheyaKaeViewer.worldPositions);
+  const expected = resolveItems({...normalized, furniture:
+    normalized.furniture.map((item) => ({...item,
+      ...normalized.proposals[0].placements.find((entry) =>
+        entry.id === item.id,
+      ),
+    })),
+  });
+  for (const id of ['books', 'oven', 'clock']) {
+    const item = expected.find((entry) => entry.id === id);
+    assert.ok(Math.abs(positions[id].x - item.x) < 1e-6);
+    assert.ok(Math.abs(positions[id].y - item.y) < 1e-6);
+    assert.ok(Math.abs(positions[id].z - item.z) < 1e-6);
+  }
+  await page.locator('#proposal').selectOption('current');
   await page.locator('.furniture-button[data-id="shelf"]').click();
   await page.screenshot({path: 'output/detailed-demo.png', fullPage: true});
   await page.setViewportSize({width: 390, height: 844});
