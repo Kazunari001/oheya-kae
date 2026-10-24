@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {requireValue} from './errors.js';
-import {normalizeFurniture, normalizeRoom, KINDS} from './model.js';
+import {normalizeFurniture, normalizeRoom, normalizeImages, KINDS} from './model.js';
 
 const validId = (value) => typeof value === 'string' &&
     /^[a-zA-Z0-9_-]{1,100}$/.test(value);
@@ -18,6 +18,9 @@ export function normalizeAnalysis(raw) {
   requireValue(raw && typeof raw === 'object' && !Array.isArray(raw),
       'analysis must be an object');
   const result = structuredClone(raw);
+  if (result.images !== undefined) {
+    result.images = normalizeImages(result.images);
+  }
   for (const key of ['sources', 'regions', 'detections']) {
     requireValue(Array.isArray(result[key]),
         `analysis.${key} must be an array`);
@@ -86,12 +89,20 @@ export function validateAnalysisLinks(project) {
   const items = [project.room, ...project.furniture, ...project.objects,
     ...(project.room?.openings ?? [])].filter(Boolean);
   const ids = new Set(items.map((item) => item.id));
-  const uniqueImages = new Map(items.flatMap((item) => item.images ?? [])
-      .map((image) => [image.data, image]));
-  const hashes = new Set([...uniqueImages.values()].map(imageHash));
+  const uniqueImages = new Map([
+    ...items.flatMap((item) => item.images ?? []),
+    ...(project.analysis.images ?? []),
+  ].map((image) => [image.data, image]));
+  const imagesByHash = new Map([...uniqueImages.values()].map((image) =>
+    [imageHash(image), image],
+  ));
   for (const source of project.analysis.sources) {
-    requireValue(hashes.has(source.sha256), 'Source image hash mismatch');
+    requireValue(imagesByHash.has(source.sha256), 'Source image hash mismatch');
   }
+  // Migrate older projects before a mutation can delete an image's sole owner.
+  project.analysis.images = [...new Set(project.analysis.sources.map((source) =>
+    imagesByHash.get(source.sha256),
+  ))];
   for (const detection of project.analysis.detections) {
     requireValue(detection.targetId == null || ids.has(detection.targetId),
         'Detection target does not exist');
@@ -128,9 +139,11 @@ function mergeItem(previous, incoming) {
       }];
     }
   }
-  next.images = [...new Map([...previous.images, ...incoming.images].map(
-      (image) => [image.data, image],
-  )).values()];
+  if (previous.images || incoming.images) {
+    next.images = [...new Map([
+      ...(previous.images ?? []), ...(incoming.images ?? []),
+    ].map((image) => [image.data, image])).values()];
+  }
   return next;
 }
 
@@ -162,20 +175,24 @@ export function importAnalysis(project, data, images, kind) {
         'A detection ID cannot be reused for a different source');
   }
   const oldItems = [...project.furniture, ...project.objects];
+  const previousIds = new Set([
+    ...oldItems, project.room, ...(project.room?.openings ?? []),
+  ].filter(Boolean).map((item) => item.id));
   const remap = new Map();
   const used = new Set();
   const prepare = (raw) => {
     const detection = metadata?.detections.find((entry) =>
-      entry.id === raw.sourceId || (raw.id && entry.targetId === raw.id),
+      entry.id === raw.sourceId,
+    ) ?? metadata?.detections.find((entry) =>
+      raw.id && entry.targetId === raw.id,
     );
     const previousTarget = detection
       ? project.analysis?.idMap?.[detection.id] : null;
     requireValue(detection?.decision !== 'excluded',
         'Excluded detections must remain metadata-only');
-    const previous = oldItems.find((item) =>
-      item.id === previousTarget || item.id === raw.id ||
-      (raw.sourceId && item.sourceId === raw.sourceId),
-    );
+    const previous = oldItems.find((item) => item.id === previousTarget) ??
+        oldItems.find((item) => item.id === raw.id) ??
+        oldItems.find((item) => raw.sourceId && item.sourceId === raw.sourceId);
     const input = {...raw, images,
       sourceId: raw.sourceId ?? detection?.id ?? null};
     if (input.kind && !KINDS.includes(input.kind)) {
@@ -197,8 +214,18 @@ export function importAnalysis(project, data, images, kind) {
   let importedRoom;
   if (kind === 'room') {
     const raw = data.room ?? data;
-    importedRoom = mergeItem(project.room,
+    const previous = project.room;
+    importedRoom = mergeItem(previous,
         normalizeRoom({...raw, images}));
+    if (previous && previous.evidence.openings.status !== 'confirmed') {
+      const openings = new Map(previous.openings.map((entry) =>
+        [entry.id, entry],
+      ));
+      for (const opening of importedRoom.openings) {
+        openings.set(opening.id, mergeItem(openings.get(opening.id), opening));
+      }
+      importedRoom.openings = [...openings.values()];
+    }
     if (raw.id) {
       remap.set(raw.id, importedRoom.id);
     }
@@ -231,8 +258,10 @@ export function importAnalysis(project, data, images, kind) {
   }
   if (metadata) {
     for (const detection of metadata.detections) {
-      detection.targetId = remap.get(detection.targetId) ??
-          detection.targetId ?? null;
+      if (!previousIds.has(detection.targetId)) {
+        detection.targetId = remap.get(detection.targetId) ??
+            detection.targetId ?? null;
+      }
     }
     // Preserve the original answer separately from accepted/corrected fields.
     const raw = structuredClone(data);
@@ -244,6 +273,9 @@ export function importAnalysis(project, data, images, kind) {
     const merged = {...previous, ...metadata, raw, runs:
       runs.some((entry) => JSON.stringify(entry) === serialized)
         ? runs : [...runs, raw]};
+    merged.images = [...new Map([
+      ...(previous?.images ?? []), ...images,
+    ].map((image) => [image.data, image])).values()];
     for (const key of ['sources', 'regions', 'detections']) {
       merged[key] = [...new Map([
         ...(previous?.[key] ?? []), ...metadata[key],

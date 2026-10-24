@@ -107,7 +107,12 @@ function notes(value = []) {
   );
   return value.map((n) => string(n, 'uncertainty'));
 }
-function images(value = []) {
+/**
+ * Validate embedded source images at both scene and provenance boundaries.
+ * @param {!Array<!Object>} value Image names and raster data URLs.
+ * @return {!Array<!Object>} Normalized embedded images.
+ */
+export function normalizeImages(value = []) {
   requireValue(Array.isArray(value), 'images must be an array');
   return value.map((i) => {
     object(i, 'image');
@@ -267,7 +272,7 @@ export function normalizeFurniture(
       ? (raw.parentId ? null : 0)
       : (raw.y === null ? null : number(raw.y, 'y')),
     frameThickness: number(raw.frameThickness ?? 20, 'frameThickness', 1, 1e6),
-    images: images(raw.images),
+    images: normalizeImages(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
   requireValue(
@@ -395,7 +400,7 @@ export function normalizeRoom(
     outline,
     height: dimension(raw.height, 'height'),
     openings: [],
-    images: images(raw.images),
+    images: normalizeImages(raw.images),
     uncertainties: notes(raw.uncertainties),
   };
   requireValue(

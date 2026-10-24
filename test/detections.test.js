@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {emptyProject, normalizeProject, revise} from '../src/model.js';
-import {importAnalysis, normalizeAnalysis, unlinkDetection} from '../src/detections.js';
+import {importAnalysis, normalizeAnalysis, unlinkDetection, imageHash} from '../src/detections.js';
 import {convertJevReport} from '../src/jev.js';
 
 const analysis = JSON.parse(await readFile(
@@ -162,4 +162,115 @@ test('partial analysis keeps earlier detections and raw answers', () => {
   assert.equal(saved.analysis.idMap.clock, null);
   assert.equal(saved.analysis.detections[7].decision, 'pending');
   assert.equal(saved.analysis.raw.object.width, 320);
+});
+
+test('provenance retains a unique photo after its only scene owner is deleted',
+    () => {
+      for (const kind of ['furniture', 'object']) {
+        for (const withRoom of [false, true]) {
+          const project = withRoom ? imported() : emptyProject();
+          const unique = {...image, name: 'unique.png', data:
+            'data:image/png;base64,' + Buffer.concat([
+              Buffer.from(image.data.split(',')[1], 'base64'), Buffer.from([1]),
+            ]).toString('base64')};
+          const metadata = {
+            sources: [{id: 'unique-photo', sha256: imageHash(unique)}],
+            regions: [], detections: [{...analysis.analysis.detections[7],
+              id: 'unique-detection', targetId: 'unique-item',
+              imageId: 'unique-photo'}],
+          };
+          importAnalysis(project, {[kind]: {id: 'unique-item', name: 'unique'},
+            analysis: metadata}, [unique], kind);
+          let saved = normalizeProject(project);
+          // Older saved projects must migrate before a mutation removes images.
+          delete saved.analysis.images;
+          saved = normalizeProject(saved);
+          const key = kind === 'object' ? 'objects' : 'furniture';
+          saved[key] = saved[key].filter((item) => item.id !== 'unique-item');
+          unlinkDetection(saved, 'unique-item');
+          saved = normalizeProject(JSON.parse(JSON.stringify(saved)));
+          assert.equal(saved.analysis.idMap['unique-detection'], null);
+          assert.ok(saved.analysis.images.some((entry) =>
+            entry.data === unique.data,
+          ));
+          assert.equal(saved.analysis.detections.at(-1).decision, 'pending');
+        }
+      }
+    });
+
+test('opening merge preserves confirmed fields and omitted openings', () => {
+  const project = imported();
+  const door = project.room.openings[0];
+  const before = structuredClone(door);
+  door.width = 900;
+  revise(door, before, ['width'], 'confirmed', '実測の幅');
+  const evidence = structuredClone(door.evidence.width);
+  const incoming = structuredClone(analysis);
+  incoming.room.openings[0].height = 1900;
+  incoming.room.openings.push({id: 'window', type: 'window', wall: 0,
+    offset: 2000, width: 500, height: 500, sill: 1200});
+  importAnalysis(project, incoming, [image], 'room');
+  let saved = normalizeProject(project);
+  const updated = saved.room.openings.find((item) => item.id === door.id);
+  assert.equal(updated.width, 900);
+  assert.deepEqual(updated.evidence.width, evidence);
+  assert.equal(updated.height, 1900);
+  assert.equal(updated.evidence.height.history.at(-1).value, 2000);
+  assert.equal(saved.room.openings.length, 2);
+  incoming.room.openings.shift();
+  importAnalysis(saved, incoming, [image], 'room');
+  saved = normalizeProject(saved);
+  assert.equal(saved.room.openings.length, 2);
+  assert.deepEqual(saved.room.openings[0].evidence.width, evidence);
+});
+
+test('identity prioritizes detection mapping, ID, then source ID', () => {
+  const seed = {
+    furniture: [{id: 'one', sourceId: 'd1', name: 'first'},
+      {id: 'two', sourceId: 'd2', name: 'second'}],
+    room: {},
+    analysis: {sources: analysis.analysis.sources, regions: [], detections:
+      ['one', 'two'].map((targetId, index) => ({
+        ...analysis.analysis.detections[7], id: `d${index + 1}`,
+        imageId: 'photo', targetId,
+      }))},
+  };
+  for (const reverse of [false, true]) {
+    const project = emptyProject();
+    importAnalysis(project, seed, [image], 'room');
+    const saved = normalizeProject(project);
+    if (reverse) {
+      saved.furniture.reverse();
+    }
+    const metadata = structuredClone(seed.analysis);
+    metadata.detections[1].targetId = 'one';
+    importAnalysis(saved, {furniture: {
+      id: 'one', sourceId: 'd2', name: 'updated'},
+    analysis: metadata}, [image], 'furniture');
+    const merged = normalizeProject(saved);
+    assert.equal(merged.furniture.length, 2);
+    assert.equal(merged.furniture.find((item) => item.id === 'one').name,
+        'first');
+    assert.equal(merged.furniture.find((item) => item.id === 'two').name,
+        'updated');
+    assert.equal(merged.analysis.idMap.d1, 'one');
+    assert.equal(merged.analysis.idMap.d2, 'two');
+    importAnalysis(merged, {furniture: {
+      id: 'two', sourceId: 'd1', name: 'id-priority',
+    }}, [image], 'furniture');
+    assert.equal(merged.furniture.find((item) => item.id === 'one').name,
+        'first');
+    assert.equal(merged.furniture.find((item) => item.id === 'two').name,
+        'id-priority');
+    const fallback = normalizeProject(project);
+    if (reverse) {
+      fallback.furniture.reverse();
+    }
+    importAnalysis(fallback, {furniture: {
+      id: 'new-alias', sourceId: 'd1', name: 'source-fallback',
+    }}, [image], 'furniture');
+    assert.equal(fallback.furniture.find((item) => item.id === 'one').name,
+        'source-fallback');
+    assert.equal(fallback.furniture.length, 2);
+  }
 });

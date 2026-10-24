@@ -19,6 +19,45 @@ function run(project, ...args) {
       {encoding: 'utf8'}));
 }
 
+test('CLI deletes sole image owners while retaining pending source candidates',
+    async (t) => {
+      const directory = await workspace(t);
+      const data = JSON.parse(await readFile(
+          'test/fixtures/detailed-analysis.json', 'utf8'));
+      const imageFile = path.join(directory, 'single.png');
+      const imageBytes = Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0' +
+          'lEQVR42mP8/x8AAwMCAO+jMZkAAAAASUVORK5CYII=', 'base64');
+      await writeFile(imageFile, imageBytes);
+      for (const kind of ['furniture', 'object']) {
+        for (const withRoom of [false, true]) {
+          const file = path.join(directory, `${kind}-${withRoom}.json`);
+          if (withRoom) {
+            run(file, 'room', 'create', '--width', '2000', '--depth', '2000');
+          }
+          const analysisFile = path.join(directory, `${kind}-analysis.json`);
+          await writeFile(analysisFile, JSON.stringify({
+            [kind]: {id: 'single'}, analysis: {
+              sources: data.analysis.sources, regions: [],
+              detections: [{...data.analysis.detections[7],
+                id: 'single-detection', targetId: 'single'}],
+            },
+          }));
+          run(file, kind, 'import', '--image', imageFile,
+              '--analysis', analysisFile);
+          run(file, kind, 'remove', '--id', 'single');
+          const saved = run(file, 'state').project;
+          assert.equal(saved.analysis.idMap['single-detection'], null);
+          assert.equal(saved.analysis.images.length, 1);
+          assert.equal(saved.analysis.detections[0].decision, 'pending');
+          const htmlFile = path.join(directory, `${kind}-${withRoom}.html`);
+          run(file, 'export', '--output', htmlFile);
+          assert.ok((await readFile(htmlFile, 'utf8'))
+              .includes(imageBytes.toString('base64')));
+        }
+      }
+    });
+
 test('CLI saves objects, follows parents and refuses orphaning or bad imports',
     async (t) => {
       const directory = await workspace(t);

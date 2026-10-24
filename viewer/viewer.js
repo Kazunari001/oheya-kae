@@ -206,6 +206,7 @@ function sources() {
     ...(room?.images ?? []),
     ...project.furniture.flatMap((furniture) => furniture.images),
     ...(project.objects ?? []).flatMap((item) => item.images),
+    ...(project.analysis?.images ?? []),
   ];
   const seen = new Set();
   for (const source of list) {
