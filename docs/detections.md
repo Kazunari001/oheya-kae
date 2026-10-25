@@ -155,6 +155,10 @@ room update、room opening update、furniture update/move、object updateで
 履歴は元のunknown/null、モデル値、仮値、人の確認・再修正を区別します。
 本体による一律の寸法補完は行いません。
 
+`room scale`と`furniture scale`も変更前の値・状態・注記と既存履歴を残します。
+部屋の輪郭・開口部と比例変更した寸法・座標はestimatedとなります。
+家具の基準寸法のみconfirmedとし、不明寸法は補完しません。
+
 ## ビューアー
 
 「拡大・検出枠を確認」から元画像と枠を開けます。枠はTabとEnterでも選択できます。

@@ -462,32 +462,30 @@ room
         ];
         const factor =
           options.length / Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const previousRoom = structuredClone(currentRoom);
         currentRoom.outline = currentRoom.outline.map(([x, z]) => [
           x * factor,
           z * factor,
         ]);
-        currentRoom.evidence.outline = {
-          status: 'estimated',
-          note: `壁${options.wall}の実寸${options.length}mmで縮尺補正。他の辺は未確認。`,
-        };
+        revise(currentRoom, previousRoom, ['outline'], 'estimated',
+            `壁${options.wall}の実寸${options.length}mmで縮尺補正。他の辺は未確認。`);
         for (const opening of currentRoom.openings) {
+          const previous = structuredClone(opening);
           for (const k of ['offset', 'width', 'clearance']) {
             opening[k] *= factor;
-            opening.evidence[k] = {
-              status: 'estimated',
-              note: '部屋の縮尺補正に追従。',
-            };
           }
+          revise(opening, previous, ['offset', 'width', 'clearance'],
+              'estimated', '部屋の縮尺補正に追従。');
         }
+        revise(currentRoom, previousRoom, ['openings'], 'estimated',
+            '部屋の縮尺補正に追従。');
         if (options.includeFurniture) {
           for (const item of project.furniture) {
+            const previous = structuredClone(item);
             for (const k of ['x', 'z', 'width', 'depth']) {
               if (item[k] != null) {
                 item[k] *= factor;
-                item.evidence[k] = {
-                  status: 'estimated',
-                  note: '部屋の縮尺補正に追従。',
-                };
+                revise(item, previous, [k], 'estimated', '部屋の縮尺補正に追従。');
               }
             }
           }
@@ -699,13 +697,11 @@ furniture
         );
         number(options.length, 'length', 1, 1e6);
         const factor = options.length / item[options.dimension];
+        const previous = structuredClone(item);
         for (const k of ['width', 'depth', 'height']) {
           if (item[k] != null) {
             item[k] *= factor;
-            item.evidence[k] = {
-              status: 'estimated',
-              note: '基準寸法で比例補正。比率は未確認。',
-            };
+            revise(item, previous, [k], 'estimated', '基準寸法で比例補正。比率は未確認。');
           }
         }
         confirmed(item, [options.dimension]);

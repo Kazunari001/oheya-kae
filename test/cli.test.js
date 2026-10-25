@@ -308,6 +308,50 @@ test('a concurrent mutation lock is respected', async (t) => {
   );
   assert.equal(r.error.code, 'PROJECT_BUSY');
 });
+
+test('scaling preserves previous values, notes and nested opening histories',
+    async (t) => {
+      const file = path.join(await temp(t), 'history.json');
+      cli(file, 'room', 'create', '--width', '4000', '--depth', '5000');
+      cli(file, 'room', 'opening', 'add', '--type', 'door', '--wall', '0',
+          '--offset', '100', '--width', '800', '--height', '2000');
+      cli(file, 'furniture', 'add', '--id', 'desk', '--width', '1000',
+          '--depth', '500', '--x', '1000', '--z', '1000');
+      cli(file, 'furniture', 'update', '--id', 'desk', '--width', '1200',
+          '--status', 'estimated', '--note', '幅を仮補正');
+      const before = cli(file, 'state').project;
+      assert.equal(cli(file, 'room', 'scale', '--wall', '0', '--length',
+          '8000', '--include-furniture').ok, true);
+      const scaled = cli(file, 'state').project;
+      const oldWidth = before.furniture[0].evidence.width;
+      assert.deepEqual(scaled.furniture[0].evidence.width.history, [
+        ...oldWidth.history,
+        {value: 1200, status: oldWidth.status, note: oldWidth.note},
+      ]);
+      assert.deepEqual(scaled.room.evidence.outline.history.at(-1).value,
+          before.room.outline);
+      assert.deepEqual(scaled.room.evidence.openings.history.at(-1).value,
+          before.room.openings);
+      for (const key of ['offset', 'width', 'clearance']) {
+        const opening = before.room.openings[0];
+        assert.deepEqual(scaled.room.openings[0].evidence[key].history, [
+          ...(opening.evidence[key].history ?? []),
+          {value: opening[key], status: opening.evidence[key].status,
+            note: opening.evidence[key].note},
+        ]);
+      }
+      assert.equal(cli(file, 'furniture', 'scale', '--id', 'desk',
+          '--dimension', 'width', '--length', '1200').ok, true);
+      const item = cli(file, 'state').project.furniture[0];
+      assert.deepEqual(item.evidence.width.history.slice(0, -1), [
+        ...scaled.furniture[0].evidence.width.history,
+        {value: 2400, status: 'estimated', note: '部屋の縮尺補正に追従。'},
+      ]);
+      assert.equal(item.evidence.width.status, 'confirmed');
+      assert.equal(item.evidence.depth.status, 'estimated');
+      assert.equal(item.evidence.height.status, 'unknown');
+      assert.equal(item.height, null);
+    });
 test('malformed saved projects are not replaced by empty state', async (t) => {
   const dir = await temp(t);
   const file = path.join(dir, 'p.json');
