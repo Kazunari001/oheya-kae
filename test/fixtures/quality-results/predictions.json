@@ -1,0 +1,194 @@
+[
+  {
+    "id": "shelf",
+    "imageId": "quality-room",
+    "category": "shelf",
+    "confidence": 0.89,
+    "box": [
+      0.1,
+      0.26,
+      0.32999999999999996,
+      0.64
+    ]
+  },
+  {
+    "id": "books",
+    "imageId": "quality-room",
+    "category": "books",
+    "confidence": 0.97,
+    "box": [
+      0.12,
+      0.69,
+      0.18,
+      0.17000000000000004
+    ]
+  },
+  {
+    "id": "oven",
+    "imageId": "quality-room",
+    "category": "appliance",
+    "confidence": 0,
+    "box": [
+      0.14,
+      0.4,
+      0.24,
+      0.18999999999999995
+    ]
+  },
+  {
+    "id": "rack",
+    "imageId": "quality-room",
+    "category": "clothes_rack",
+    "confidence": 0.88,
+    "box": [
+      0.54,
+      0.34,
+      0.31999999999999995,
+      0.32
+    ]
+  },
+  {
+    "id": "clock-left",
+    "imageId": "quality-room",
+    "category": "clock",
+    "confidence": 0.94,
+    "box": [
+      0.55,
+      0.06,
+      0.08999999999999997,
+      0.12
+    ]
+  },
+  {
+    "id": "clock-edge",
+    "imageId": "quality-room",
+    "category": "clock",
+    "confidence": 0.97,
+    "box": [
+      0.92,
+      0.07,
+      0.07999999999999996,
+      0.13999999999999999
+    ]
+  },
+  {
+    "id": "desk",
+    "imageId": "quality-room",
+    "category": "desk",
+    "confidence": 0,
+    "box": [
+      0.02,
+      0.26,
+      0.9299999999999999,
+      0.71
+    ]
+  },
+  {
+    "id": "sofa",
+    "imageId": "quality-room",
+    "category": "sofa",
+    "confidence": 0,
+    "box": [
+      0.04,
+      0.45,
+      0.48000000000000004,
+      0.52
+    ]
+  },
+  {
+    "id": "shelf",
+    "imageId": "quality-empty",
+    "category": "shelf",
+    "confidence": 0,
+    "box": [
+      0.01,
+      0.02,
+      0.97,
+      0.95
+    ]
+  },
+  {
+    "id": "books",
+    "imageId": "quality-empty",
+    "category": "books",
+    "confidence": 0,
+    "box": [
+      0.01,
+      0.03,
+      0.54,
+      0.95
+    ]
+  },
+  {
+    "id": "oven",
+    "imageId": "quality-empty",
+    "category": "appliance",
+    "confidence": 0,
+    "box": [
+      0.02,
+      0.02,
+      0.52,
+      0.51
+    ]
+  },
+  {
+    "id": "rack",
+    "imageId": "quality-empty",
+    "category": "clothes_rack",
+    "confidence": 0,
+    "box": [
+      0.01,
+      0.02,
+      0.97,
+      0.95
+    ]
+  },
+  {
+    "id": "clock-left",
+    "imageId": "quality-empty",
+    "category": "clock",
+    "confidence": 0,
+    "box": [
+      0.02,
+      0.02,
+      0.52,
+      0.51
+    ]
+  },
+  {
+    "id": "clock-edge",
+    "imageId": "quality-empty",
+    "category": "clock",
+    "confidence": 0,
+    "box": [
+      0.9,
+      0.02,
+      0.08999999999999997,
+      0.95
+    ]
+  },
+  {
+    "id": "desk",
+    "imageId": "quality-empty",
+    "category": "desk",
+    "confidence": 0,
+    "box": [
+      0,
+      0.01,
+      0.99,
+      0.98
+    ]
+  },
+  {
+    "id": "sofa",
+    "imageId": "quality-empty",
+    "category": "sofa",
+    "confidence": 0,
+    "box": [
+      0.01,
+      0.02,
+      0.98,
+      0.96
+    ]
+  }
+]

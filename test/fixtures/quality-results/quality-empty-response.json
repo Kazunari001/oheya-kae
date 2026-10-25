@@ -1,0 +1,189 @@
+{
+  "model": "jev-1.14.0",
+  "answers": {
+    "shelf_present": {
+      "type": "noul",
+      "noul": 0.08
+    },
+    "shelf_box": {
+      "type": "box",
+      "box": {
+        "top": 0.02,
+        "bottom": 0.97,
+        "left": 0.01,
+        "right": 0.98
+      },
+      "confidence": 0.03
+    },
+    "shelf_kind": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.96,
+      "probabilities": {
+        "desk": 0.0,
+        "table": 0.0,
+        "chair": 0.0,
+        "sofa": 0.0,
+        "bed": 0.0,
+        "shelf": 0.04,
+        "cabinet": 0.0,
+        "box": 0.0,
+        "other": 0.0,
+        "none": 0.96
+      }
+    },
+    "books_present": {
+      "type": "noul",
+      "noul": 0.05
+    },
+    "books_box": {
+      "type": "box",
+      "box": {
+        "top": 0.03,
+        "bottom": 0.98,
+        "left": 0.01,
+        "right": 0.55
+      },
+      "confidence": 0.05
+    },
+    "oven_present": {
+      "type": "noul",
+      "noul": 0.06
+    },
+    "oven_box": {
+      "type": "box",
+      "box": {
+        "top": 0.02,
+        "bottom": 0.53,
+        "left": 0.02,
+        "right": 0.54
+      },
+      "confidence": 0.04
+    },
+    "rack_present": {
+      "type": "noul",
+      "noul": 0.07
+    },
+    "rack_box": {
+      "type": "box",
+      "box": {
+        "top": 0.02,
+        "bottom": 0.97,
+        "left": 0.01,
+        "right": 0.98
+      },
+      "confidence": 0.03
+    },
+    "rack_kind": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.99,
+      "probabilities": {
+        "desk": 0.0,
+        "table": 0.0,
+        "chair": 0.0,
+        "sofa": 0.0,
+        "bed": 0.0,
+        "shelf": 0.0,
+        "cabinet": 0.0,
+        "box": 0.0,
+        "other": 0.01,
+        "none": 0.99
+      }
+    },
+    "clock-left_present": {
+      "type": "noul",
+      "noul": 0.17
+    },
+    "clock-left_box": {
+      "type": "box",
+      "box": {
+        "top": 0.02,
+        "bottom": 0.53,
+        "left": 0.02,
+        "right": 0.54
+      },
+      "confidence": 0.04
+    },
+    "clock-edge_present": {
+      "type": "noul",
+      "noul": 0.09
+    },
+    "clock-edge_box": {
+      "type": "box",
+      "box": {
+        "top": 0.02,
+        "bottom": 0.97,
+        "left": 0.9,
+        "right": 0.99
+      },
+      "confidence": 0.04
+    },
+    "desk_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "desk_box": {
+      "type": "box",
+      "box": {
+        "top": 0.01,
+        "bottom": 0.99,
+        "left": 0.0,
+        "right": 0.99
+      },
+      "confidence": 0.32
+    },
+    "desk_kind": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.99,
+      "probabilities": {
+        "desk": 0.01,
+        "table": 0.0,
+        "chair": 0.0,
+        "sofa": 0.0,
+        "bed": 0.0,
+        "shelf": 0.0,
+        "cabinet": 0.0,
+        "box": 0.0,
+        "other": 0.0,
+        "none": 0.99
+      }
+    },
+    "sofa_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "sofa_box": {
+      "type": "box",
+      "box": {
+        "top": 0.02,
+        "bottom": 0.98,
+        "left": 0.01,
+        "right": 0.99
+      },
+      "confidence": 0.09
+    },
+    "sofa_kind": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.99,
+      "probabilities": {
+        "desk": 0.0,
+        "table": 0.0,
+        "chair": 0.0,
+        "sofa": 0.01,
+        "bed": 0.0,
+        "shelf": 0.0,
+        "cabinet": 0.0,
+        "box": 0.0,
+        "other": 0.0,
+        "none": 0.99
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 3263,
+    "output_tokens": 637
+  }
+}

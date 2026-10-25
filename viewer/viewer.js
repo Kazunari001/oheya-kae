@@ -9,6 +9,20 @@ const payload = JSON.parse(
 const project = payload.project;
 const room = project.room;
 const getElement = (id) => document.getElementById(id);
+const revision = payload.revision;
+if (revision) {
+  const stages = {snapshot: 'スナップショット', raw: '原回答版',
+    corrected: '補正版', estimated: '仮値補完版'};
+  getElement('revision-info').textContent = [
+    `プロジェクト: ${revision.projectId}`,
+    `出力元: ${revision.sourceProject ?? 'ファイル名なし'}`,
+    `プロジェクト版: ${revision.projectRevision}`,
+    `解析版: ${revision.analysisRevision ?? '解析情報なし'}`,
+    `解析履歴: ${revision.analysisRuns.join(', ') || 'なし'}`,
+    `出力日時: ${revision.exportedAt}`,
+    `版の区分（出力者指定）: ${stages[revision.stage]}`,
+  ].join('\n');
+}
 const formatMillimeters = (v) =>
   v == null ? '不明' : `${Math.round(v).toLocaleString()} mm`;
 const STATUS_NAMES = {
@@ -21,6 +35,7 @@ let activeFurniture = resolveItems(project);
 let report = payload.validation;
 let selected = null;
 let mode = '3d';
+let showNames = true;
 let showDimensions = true;
 let showWalls = true;
 let renderer;
@@ -1046,8 +1061,11 @@ function init() {
     const occupied = [];
     for (const label of labels) {
       const projected = label.position.clone().project(camera);
+      const visible = label.el.classList.contains('furniture')
+        ? showNames
+        : showDimensions;
       label.el.style.display =
-        showDimensions &&
+        visible &&
         projected.z >= -1 &&
         projected.z <= 1 &&
         Math.abs(projected.x) < 1 &&
@@ -1120,6 +1138,10 @@ function init() {
   getElement('view-3d').onclick = () => setMode('3d');
   getElement('view-top').onclick = () => setMode('top');
   getElement('reset').onclick = resetView;
+  getElement('names').onclick = () => {
+    showNames = !showNames;
+    getElement('names').setAttribute('aria-pressed', String(showNames));
+  };
   getElement('walls').onclick = () => {
     showWalls = !showWalls;
     getElement('walls').setAttribute(

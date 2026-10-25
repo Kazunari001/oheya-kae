@@ -24,6 +24,11 @@
       <aside>
         <div class="eyebrow">ROOM / 01</div>
         <h1 id="room-name">部屋</h1>
+        <details id="revision-details">
+          <summary>出力元・版を確認</summary>
+          <p id="revision-info" class="evidence"></p>
+          <p>このHTMLは書き出し時点の内容です。CLIでの変更後は再出力してください。</p>
+        </details>
         <div id="room-summary" class="room-summary"></div>
         <div class="stat-grid">
           <div class="stat">
@@ -65,7 +70,7 @@
         </dialog>
         <h2>TO CONFIRM / 補正・確認</h2>
         <ul id="corrections" class="corrections"></ul>
-        <details>
+        <details id="license-details">
           <summary>表示・検証について</summary>
           <p>
             寸法:mm。編集はCLIで行いHTMLを再出力してください。寸法・設置高さが不明な物体は3D表示を省略します。天井高不明時は2400mmの仮表示。棚・机・ラック・本・画面・照明は描画と共通の占有部、時計・家電等は外接箱で検証します。扉の開閉軌跡・通路全体の連結性は検証しません。
@@ -86,6 +91,7 @@
             THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
             DAMAGES OR OTHER LIABILITY.
           </p>
+          <pre class="license-text"><!--OHEYA_KAE_LICENSE--></pre>
         </details>
       </aside>
       <main>
@@ -98,7 +104,8 @@
             ><button id="view-top" aria-pressed="false">間取り</button>
           </div>
           <div class="tool-options">
-            <button id="dimensions" aria-pressed="true">寸法</button
+            <button id="names" aria-pressed="true">名称</button
+            ><button id="dimensions" aria-pressed="true">寸法</button
             ><button id="walls" aria-pressed="true">壁</button
             ><button id="reset">視点を戻す</button>
           </div>

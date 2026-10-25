@@ -1,0 +1,153 @@
+{
+  "model": "jev-1.14.0",
+  "image": "C:\\workspace\\app\\oheya-kae\\test\\fixtures\\quality-room.png",
+  "sha256": "8d086eb2066ec6a680fd7675993c9a3b3d70ee0e6c68d073d31b416b429acad7",
+  "width": 800,
+  "height": 600,
+  "min_presence": 0.8,
+  "input_transform": null,
+  "usage": {
+    "input_tokens": 3263,
+    "output_tokens": 638
+  },
+  "targets": [
+    {
+      "id": "shelf",
+      "name": "左の棚",
+      "description": "the open storage shelf on the left, its entire frame",
+      "role": "furniture",
+      "presence": 0.89,
+      "box": {
+        "top": 0.26,
+        "bottom": 0.9,
+        "left": 0.1,
+        "right": 0.43
+      },
+      "box_confidence": 0.87,
+      "kind": "shelf",
+      "kind_confidence": 0.99,
+      "included": true
+    },
+    {
+      "id": "books",
+      "name": "下段の本",
+      "description": "the group of upright books on the lower shelf",
+      "role": "object",
+      "parent_id": "shelf",
+      "presence": 0.97,
+      "box": {
+        "top": 0.69,
+        "bottom": 0.86,
+        "left": 0.12,
+        "right": 0.3
+      },
+      "box_confidence": 0.9,
+      "kind": null,
+      "kind_confidence": null,
+      "included": true
+    },
+    {
+      "id": "oven",
+      "name": "中段の家電",
+      "description": "the dark oven-like appliance on the middle shelf",
+      "role": "object",
+      "parent_id": "shelf",
+      "presence": 0.64,
+      "box": {
+        "top": 0.4,
+        "bottom": 0.59,
+        "left": 0.14,
+        "right": 0.38
+      },
+      "box_confidence": 0.91,
+      "kind": null,
+      "kind_confidence": null,
+      "included": false
+    },
+    {
+      "id": "rack",
+      "name": "衣類ラック",
+      "description": "the clothes rack with two hanging shirts on the right, its entire frame",
+      "role": "furniture",
+      "presence": 0.88,
+      "box": {
+        "top": 0.34,
+        "bottom": 0.66,
+        "left": 0.54,
+        "right": 0.86
+      },
+      "box_confidence": 0.93,
+      "kind": "other",
+      "kind_confidence": 1.0,
+      "included": true
+    },
+    {
+      "id": "clock-left",
+      "name": "左の時計",
+      "description": "the complete round wall clock above the clothes rack, left of the other clock",
+      "role": "object",
+      "presence": 0.94,
+      "box": {
+        "top": 0.06,
+        "bottom": 0.18,
+        "left": 0.55,
+        "right": 0.64
+      },
+      "box_confidence": 0.91,
+      "kind": null,
+      "kind_confidence": null,
+      "included": true
+    },
+    {
+      "id": "clock-edge",
+      "name": "右端の時計",
+      "description": "the partly cropped round wall clock at the right edge, only its visible portion",
+      "role": "object",
+      "presence": 0.97,
+      "box": {
+        "top": 0.07,
+        "bottom": 0.21,
+        "left": 0.92,
+        "right": 1.0
+      },
+      "box_confidence": 0.76,
+      "kind": null,
+      "kind_confidence": null,
+      "included": true
+    },
+    {
+      "id": "desk",
+      "name": "不在の机",
+      "description": "a work desk",
+      "role": "furniture",
+      "presence": 0.04,
+      "box": {
+        "top": 0.26,
+        "bottom": 0.97,
+        "left": 0.02,
+        "right": 0.95
+      },
+      "box_confidence": 0.13,
+      "kind": "none",
+      "kind_confidence": 0.84,
+      "included": false
+    },
+    {
+      "id": "sofa",
+      "name": "不在のソファ",
+      "description": "a sofa",
+      "role": "furniture",
+      "presence": 0.02,
+      "box": {
+        "top": 0.45,
+        "bottom": 0.97,
+        "left": 0.04,
+        "right": 0.52
+      },
+      "box_confidence": 0.08,
+      "kind": "none",
+      "kind_confidence": 0.97,
+      "included": false
+    }
+  ]
+}

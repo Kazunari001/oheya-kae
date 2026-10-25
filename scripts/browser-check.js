@@ -42,6 +42,18 @@ try {
       'b99069',
   );
   assert.equal(await page.title(), 'oheya-kae — Layout Studio');
+  await page.locator('#revision-details summary').click();
+  assert.match(await page.locator('#revision-info').textContent(),
+      /プロジェクト版: [a-f0-9]{64}/);
+  assert.match(await page.locator('#revision-info').textContent(),
+      /出力元: .*demo.json/);
+  assert.equal(
+      await page.locator('#revision-details .license-text').count(), 0);
+  assert.equal(await page.locator('.license-text').count(), 1);
+  const licenseText = await page.locator('#license-details .license-text')
+      .textContent();
+  assert.match(licenseText, /The above copyright notice/);
+  await page.locator('#revision-details summary').click();
   await page
       .getByRole('button', {name: 'ワークデスク', exact: false})
       .click();
@@ -134,6 +146,28 @@ try {
     );
   }
   await page.locator('#proposal').selectOption('current');
+  const objectLabels = page.locator('#labels .furniture:visible');
+  const dimensionLabels = page.locator(
+      '#labels .dimension:not(.furniture):visible',
+  );
+  await page.getByRole('button', {name: '名称', exact: true}).click();
+  assert.equal(
+      await page.locator('#names').getAttribute('aria-pressed'), 'false',
+  );
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#labels .furniture')]
+        .every((label) => label.style.display === 'none'),
+  );
+  assert.ok(await dimensionLabels.count() > 0);
+  await page.getByRole('button', {name: '間取り', exact: true}).click();
+  await page.locator('#proposal').selectOption(options[1]);
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#labels .furniture')]
+        .every((label) => label.style.display === 'none'),
+  );
+  assert.equal(await objectLabels.count(), 0);
+  await page.locator('#proposal').selectOption('current');
+  await page.getByRole('button', {name: '3Dビュー', exact: true}).click();
   await page
       .getByRole('button', {name: '寸法', exact: true})
       .click();
@@ -141,6 +175,15 @@ try {
       await page.locator('#dimensions').getAttribute('aria-pressed'),
       'false',
   );
+  await page.getByRole('button', {name: '名称', exact: true}).click();
+  assert.equal(
+      await page.locator('#names').getAttribute('aria-pressed'), 'true',
+  );
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#labels .furniture')]
+        .some((label) => label.style.display === 'block'),
+  );
+  assert.equal(await dimensionLabels.count(), 0);
   await page
       .getByRole('button', {name: '寸法', exact: true})
       .click();
@@ -501,7 +544,7 @@ try {
   await page.waitForFunction(() => window.oheyaKaeViewer?.meshCount === 10);
   console.log(
       'Browser checks passed: file://, offline, 3D, ' +
-      'selection, orbit, top view, dimensions, proposal ' +
+      'selection, orbit, top view, names, dimensions, proposal ' +
       'comparison, mobile, support surfaces, elevated objects, parent moves, ' +
       '23 detections, crop boxes, image selection, filters and keyboard.',
   );

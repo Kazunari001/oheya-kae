@@ -1,0 +1,89 @@
+{
+  "runs": [
+    {
+      "imageId": "quality-room",
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 3263,
+        "output_tokens": 638
+      },
+      "sourceSHA256": "8d086eb2066ec6a680fd7675993c9a3b3d70ee0e6c68d073d31b416b429acad7"
+    },
+    {
+      "imageId": "quality-empty",
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 3263,
+        "output_tokens": 637
+      },
+      "sourceSHA256": "a3b0a73707471329a87302ec7acaca0e85669ab5e99ae5de248aed4fc0beb1ba"
+    }
+  ],
+  "discoveryRuns": [
+    {
+      "imageId": "quality-room",
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5356,
+        "output_tokens": 1350
+      },
+      "proposedCategories": [
+        "shelf",
+        "clothes_rack",
+        "clock",
+        "books",
+        "oven",
+        "clothes"
+      ]
+    },
+    {
+      "imageId": "quality-empty",
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5359,
+        "output_tokens": 1348
+      },
+      "proposedCategories": []
+    }
+  ],
+  "minConfidence": 0.8,
+  "minIoU": 0.5,
+  "truePositives": 5,
+  "falsePositives": 0,
+  "falseNegatives": 1,
+  "precision": 1,
+  "recall": 0.8333333333333334,
+  "meanIoU": 0.8687056855420037,
+  "matches": [
+    {
+      "imageId": "quality-room",
+      "labelId": "books",
+      "predictionId": "books",
+      "iou": 0.8504923903312441
+    },
+    {
+      "imageId": "quality-room",
+      "labelId": "clock-edge",
+      "predictionId": "clock-edge",
+      "iou": 0.7954545454545449
+    },
+    {
+      "imageId": "quality-room",
+      "labelId": "clock-left",
+      "predictionId": "clock-left",
+      "iou": 0.8099999999999996
+    },
+    {
+      "imageId": "quality-room",
+      "labelId": "shelf",
+      "predictionId": "shelf",
+      "iou": 0.9745896464646469
+    },
+    {
+      "imageId": "quality-room",
+      "labelId": "rack",
+      "predictionId": "rack",
+      "iou": 0.9129918454595829
+    }
+  ]
+}

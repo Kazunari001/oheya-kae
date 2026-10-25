@@ -6,11 +6,13 @@ import {AppError, requireValue} from '../src/errors.js';
 import {normalizeRoom, normalizeFurniture, corrections, confirmed, revise, number, object, KINDS} from '../src/model.js';
 import {importAnalysis, unlinkDetection} from '../src/detections.js';
 import {convertDetectionReport} from '../src/detection-report.js';
+import {revisionHash} from '../src/revisions.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
 import {propose} from '../src/proposals.js';
 import {exportHTML} from '../src/export.js';
+import {scaleItems} from '../src/scaling.js';
 
 const packageMetadata = JSON.parse(
     readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
@@ -237,6 +239,9 @@ cli
       const project = await load(projectPath());
       result({
         project: project,
+        projectRevision: revisionHash(project),
+        analysisRevision: project.analysis
+          ? revisionHash(project.analysis) : null,
         corrections: corrections(project),
         validation: validate(project),
       });
@@ -435,19 +440,12 @@ room
     .requiredOption('--length <mm>', 'Measured wall length', numeric)
     .option(
         '--include-furniture',
-        'Also scale furniture horizontal dimensions and positions',
+        'Also scale furniture roots and descendants horizontally',
     )
+    .option('--include-objects', 'Also scale independent and wall object roots')
     .action(async (options) =>
       changed((project) => {
         const currentRoom = needRoom(project);
-        if (options.includeFurniture) {
-          requireValue(
-              ![...project.furniture, ...project.objects].some((item) =>
-                item.parentId || item.supports.length,
-              ),
-              'Scaling supported scenes requires explicit geometry updates',
-          );
-        }
         requireValue(
             currentRoom.outline &&
             Number.isInteger(options.wall) &&
@@ -462,37 +460,40 @@ room
         ];
         const factor =
           options.length / Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const previousRoom = structuredClone(currentRoom);
         currentRoom.outline = currentRoom.outline.map(([x, z]) => [
           x * factor,
           z * factor,
         ]);
-        currentRoom.evidence.outline = {
-          status: 'estimated',
-          note: `壁${options.wall}の実寸${options.length}mmで縮尺補正。他の辺は未確認。`,
-        };
+        revise(currentRoom, previousRoom, ['outline'], 'estimated',
+            `壁${options.wall}の実寸${options.length}mmで縮尺補正。他の辺は未確認。`);
         for (const opening of currentRoom.openings) {
+          const previous = structuredClone(opening);
           for (const k of ['offset', 'width', 'clearance']) {
             opening[k] *= factor;
-            opening.evidence[k] = {
-              status: 'estimated',
-              note: '部屋の縮尺補正に追従。',
-            };
           }
+          revise(opening, previous, ['offset', 'width', 'clearance'],
+              'estimated', '部屋の縮尺補正に追従。');
         }
-        if (options.includeFurniture) {
-          for (const item of project.furniture) {
-            for (const k of ['x', 'z', 'width', 'depth']) {
-              if (item[k] != null) {
-                item[k] *= factor;
-                item.evidence[k] = {
-                  status: 'estimated',
-                  note: '部屋の縮尺補正に追従。',
-                };
-              }
-            }
-          }
-        }
-        return {objectId: currentRoom.id, factor, room: currentRoom};
+        revise(currentRoom, previousRoom, ['openings'], 'estimated',
+            '部屋の縮尺補正に追従。');
+        const roots = [
+          ...(options.includeFurniture ? project.furniture : []),
+          ...(options.includeObjects ? project.objects : []),
+        ].filter((item) => !item.parentId || item.parentId === currentRoom.id);
+        const scaledIds = scaleItems(project, roots.map((item) => item.id),
+            factor, true, true);
+        const unscaledIds = [...project.furniture, ...project.objects]
+            .filter((item) => !scaledIds.includes(item.id))
+            .map((item) => item.id);
+        return {
+          objectId: currentRoom.id, factor, room: currentRoom,
+          warnings: unscaledIds.length ? [{
+            code: 'UNSCALED_ITEMS',
+            objectIds: unscaledIds,
+            message: '家具・小物の一部は補正対象外です。寸法・位置の比率を確認してください。',
+          }] : [],
+        };
       }),
     );
 const opening = room
@@ -686,28 +687,13 @@ furniture
       changed((project) => {
         const item = needFurniture(project, options.id);
         requireValue(
-            !item.supports.length &&
-            ![...project.furniture, ...project.objects].some((child) =>
-              child.parentId === item.id,
-            ),
-            'Scaling a support requires explicit surface and child updates',
-        );
-        requireValue(
             ['width', 'depth', 'height'].includes(options.dimension) &&
             item[options.dimension] != null,
             'A known reference dimension is required',
         );
         number(options.length, 'length', 1, 1e6);
         const factor = options.length / item[options.dimension];
-        for (const k of ['width', 'depth', 'height']) {
-          if (item[k] != null) {
-            item[k] *= factor;
-            item.evidence[k] = {
-              status: 'estimated',
-              note: '基準寸法で比例補正。比率は未確認。',
-            };
-          }
-        }
+        scaleItems(project, [item.id], factor, false, false);
         confirmed(item, [options.dimension]);
         return {objectId: item.id, factor, furniture: item};
       }),
@@ -819,6 +805,7 @@ layout
     });
 layout
     .command('propose')
+    .option('--constraints <path>', 'Fixed/priority/rotation/gap JSON')
     .option('--preference <text>', 'Requested goal', '通路を広く')
     .option('--count <number>', '1–3 proposals', numeric, 3)
     .option('--step <mm>', 'Grid step', numeric, 200)
@@ -829,7 +816,7 @@ layout
         400,
     )
     .action(async (options) =>
-      changed((project) => {
+      changed(async (project) => {
         requireValue(
             Number.isInteger(options.count) &&
             options.count >= 1 &&
@@ -838,7 +825,11 @@ layout
         );
         number(options.step, 'step', 50, 5000);
         number(options.clearance, 'clearance', 0, 5000);
-        const proposals = propose(project, options);
+        const proposals = propose(project, {
+          ...options,
+          constraints: options.constraints
+            ? await readJSON(options.constraints) : {},
+        });
         project.proposals = proposals.map(({validation, ...v}) => v);
         return {proposals, keepProposals: true};
       }),
@@ -864,6 +855,7 @@ layout
 cli
     .command('export')
     .option('--format <format>', 'html|json', 'html')
+    .option('--stage <stage>', 'snapshot|raw|corrected|estimated', 'snapshot')
     .requiredOption('--output <path>')
     .action(async (options) => {
       requireValue(
@@ -878,7 +870,9 @@ cli
       let project;
       if (options.format === 'html') {
         project = await load(projectPath());
-        await exportHTML(project, options.output);
+        await exportHTML(project, options.output, {
+          sourcePath: projectPath(), stage: options.stage,
+        });
       } else {
         project = await saveCopy(projectPath(), options.output);
       }

@@ -2,7 +2,7 @@ import {readFile, writeFile, rename, unlink, mkdir, open, realpath} from 'node:f
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {AppError} from './errors.js';
-import {emptyProject, normalizeProject} from './model.js';
+import {emptyProject, normalizeProject, id} from './model.js';
 
 /**
  * Read and parse a local UTF-8 JSON file.
@@ -119,6 +119,7 @@ export async function withFileLock(file, action) {
 export async function mutate(file, action) {
   return withFileLock(file, async (target) => {
     const project = await load(target, true);
+    project.projectId ??= id('project');
     const result = await action(project);
     await atomicWrite(
         target,
@@ -137,6 +138,7 @@ export async function saveCopy(input, output) {
   // Lock before reading: input and output may refer to the same project.
   return withFileLock(output, async (target) => {
     const project = await load(input);
+    project.projectId ??= id('project');
     await atomicWrite(
         target,
         JSON.stringify(project, null, 2) + '\n',
