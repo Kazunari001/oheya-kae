@@ -1,5 +1,8 @@
 # 物体・支持関係・設置高さ
 
+追加形状と物理属性の今後の範囲は[精細形状の設計](shape-extension-scope.md)を
+参照してください。以下は実装済みのversion 2の仕様です。
+
 保存形式version 2では、家具に加えて小物を`objects`へ保存します。
 時計・本・家電等の意味は`category`、簡易形状は`kind`で指定します。
 従来の8種類に加え、`clothes_rack`、`clock`、`books`、`appliance`、
