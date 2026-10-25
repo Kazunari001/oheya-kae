@@ -359,6 +359,10 @@ export function applyPlacements(project, placements) {
       if (!placement || !allowed.has(furniture.id)) {
         return furniture;
       }
+      if (['x', 'z', 'rotation'].every((key) =>
+        placement[key] === furniture[key])) {
+        return furniture;
+      }
       const next = {
         ...furniture,
         ...placement,

@@ -19,6 +19,27 @@ function run(project, ...args) {
       {encoding: 'utf8'}));
 }
 
+test('proposal constraint files are applied and invalid input leaves state',
+    async (t) => {
+      const directory = await workspace(t);
+      const file = path.join(directory, 'constraints-project.json');
+      const constraints = path.join(directory, 'constraints.json');
+      run(file, 'layout', 'load', '--input', 'test/fixtures/spatial-room.json');
+      await writeFile(constraints, JSON.stringify({fixedIds: ['desk'],
+        priorityIds: ['stand'], rotations: [90, 180], clearance: 0}));
+      const result = run(file, 'layout', 'propose', '--count', '1',
+          '--step', '500', '--constraints', constraints);
+      assert.deepEqual(result.proposals[0].placements[0],
+          {id: 'desk', x: 3000, z: 1000, rotation: 0});
+      const saved = await readFile(file, 'utf8');
+      await writeFile(constraints, '{"fixedIds":["missing"]}');
+      const failure = spawnSync(process.execPath,
+          ['bin/oheya-kae.js', '--project', file, 'layout', 'propose',
+            '--constraints', constraints], {encoding: 'utf8'});
+      assert.equal(failure.status, 1);
+      assert.equal(await readFile(file, 'utf8'), saved);
+    });
+
 test('CLI deletes sole image owners while retaining pending source candidates',
     async (t) => {
       const directory = await workspace(t);
