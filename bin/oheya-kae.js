@@ -492,7 +492,18 @@ room
             }
           }
         }
-        return {objectId: currentRoom.id, factor, room: currentRoom};
+        const unscaledIds = [
+          ...(options.includeFurniture ? [] : project.furniture),
+          ...project.objects,
+        ].map((item) => item.id);
+        return {
+          objectId: currentRoom.id, factor, room: currentRoom,
+          warnings: unscaledIds.length ? [{
+            code: 'UNSCALED_ITEMS',
+            objectIds: unscaledIds,
+            message: '家具・小物の一部は補正対象外です。寸法・位置の比率を確認してください。',
+          }] : [],
+        };
       }),
     );
 const opening = room

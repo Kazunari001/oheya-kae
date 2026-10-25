@@ -114,6 +114,14 @@ node bin/oheya-kae.js furniture scale --id desk-1 --dimension width --length 120
 
 ## JSON契約と検証
 
+`room scale`の対象は部屋の水平寸法です。`--include-furniture`を指定した
+場合も`objects`は対象外です。床置きの小物は寸法・位置が元のまま残るので、
+返却JSONの`warnings`（`code: UNSCALED_ITEMS`と対象外の`objectIds`）を
+確認し、`object update`で別途補正してください。
+オプションなしでは家具と小物のすべてが対象外として通知されます。
+壁掛けや親付き物体も自動変更しません。支持面・親子関係がある場面の
+`--include-furniture`は現在エラーになり、元ファイルを保持します（#24）。
+
 推定値の更新には`--status estimated --note "根拠"`を指定できます。
 検出JSON・再取り込み・更新履歴・画像枠の詳細は[検出データ](detections.md)を参照してください。
 
