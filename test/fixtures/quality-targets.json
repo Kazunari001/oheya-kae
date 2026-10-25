@@ -1,0 +1,10 @@
+[
+  {"id":"shelf","name":"左の棚","description":"the open storage shelf on the left, its entire frame","role":"furniture"},
+  {"id":"books","name":"下段の本","description":"the group of upright books on the lower shelf","role":"object","parent_id":"shelf"},
+  {"id":"oven","name":"中段の家電","description":"the dark oven-like appliance on the middle shelf","role":"object","parent_id":"shelf"},
+  {"id":"rack","name":"衣類ラック","description":"the clothes rack with two hanging shirts on the right, its entire frame","role":"furniture"},
+  {"id":"clock-left","name":"左の時計","description":"the complete round wall clock above the clothes rack, left of the other clock","role":"object"},
+  {"id":"clock-edge","name":"右端の時計","description":"the partly cropped round wall clock at the right edge, only its visible portion","role":"object"},
+  {"id":"desk","name":"不在の机","description":"a work desk","role":"furniture"},
+  {"id":"sofa","name":"不在のソファ","description":"a sofa","role":"furniture"}
+]

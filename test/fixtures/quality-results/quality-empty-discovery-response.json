@@ -1,0 +1,349 @@
+{
+  "model": "jev-1.14.0",
+  "answers": {
+    "desk_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "desk_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.95,
+      "probabilities": {
+        "none": 0.97,
+        "one": 0.03,
+        "several": 0.0
+      }
+    },
+    "chair_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "chair_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "shelf_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "shelf_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "clothes_rack_present": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "clothes_rack_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "tv_stand_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "tv_stand_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "sofa_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "sofa_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "cabinet_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "cabinet_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "bed_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "bed_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.92,
+      "probabilities": {
+        "none": 0.95,
+        "one": 0.05,
+        "several": 0.0
+      }
+    },
+    "table_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "table_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "clock_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "clock_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.95,
+      "probabilities": {
+        "none": 0.97,
+        "one": 0.03,
+        "several": 0.0
+      }
+    },
+    "books_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "books_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "oven_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "oven_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.95,
+      "probabilities": {
+        "none": 0.97,
+        "one": 0.03,
+        "several": 0.0
+      }
+    },
+    "tv_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "tv_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.94,
+      "probabilities": {
+        "none": 0.96,
+        "one": 0.04,
+        "several": 0.0
+      }
+    },
+    "monitor_present": {
+      "type": "noul",
+      "noul": 0.01
+    },
+    "monitor_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "lamp_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "lamp_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "plant_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "plant_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "clothes_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "clothes_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.01,
+        "several": 0.01
+      }
+    },
+    "bottle_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "bottle_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "frame_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "frame_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "ornament_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "ornament_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 1.0,
+      "probabilities": {
+        "none": 1.0,
+        "one": 0.0,
+        "several": 0.0
+      }
+    },
+    "bin_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "bin_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "tissue_present": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "tissue_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.98,
+      "probabilities": {
+        "none": 0.99,
+        "one": 0.01,
+        "several": 0.0
+      }
+    },
+    "door_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "door_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.95,
+      "probabilities": {
+        "none": 0.97,
+        "one": 0.03,
+        "several": 0.0
+      }
+    },
+    "window_present": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "window_count": {
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.97,
+      "probabilities": {
+        "none": 0.98,
+        "one": 0.02,
+        "several": 0.0
+      }
+    },
+    "uncatalogued_present": {
+      "type": "noul",
+      "noul": 0.03
+    }
+  },
+  "usage": {
+    "input_tokens": 5359,
+    "output_tokens": 1348
+  }
+}

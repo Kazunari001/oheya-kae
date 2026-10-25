@@ -1,0 +1,255 @@
+{
+  "model": "jev-1.14.0",
+  "image": "C:\\workspace\\app\\oheya-kae\\test\\fixtures\\quality-room.png",
+  "sha256": "8d086eb2066ec6a680fd7675993c9a3b3d70ee0e6c68d073d31b416b429acad7",
+  "width": 800,
+  "height": 600,
+  "min_presence": 0.5,
+  "usage": {
+    "input_tokens": 5356,
+    "output_tokens": 1350
+  },
+  "uncatalogued_presence": 0.14,
+  "categories": [
+    {
+      "id": "desk",
+      "name": "デスク",
+      "description": "work desk",
+      "role": "furniture",
+      "presence": 0.03,
+      "count": "none",
+      "count_confidence": 0.95,
+      "proposed": false
+    },
+    {
+      "id": "chair",
+      "name": "椅子",
+      "description": "chair or stool",
+      "role": "furniture",
+      "presence": 0.03,
+      "count": "none",
+      "count_confidence": 1.0,
+      "proposed": false
+    },
+    {
+      "id": "shelf",
+      "name": "棚・金属ラック",
+      "description": "open shelving unit or metal storage rack, excluding a clothes rail",
+      "role": "furniture",
+      "presence": 0.98,
+      "count": "one",
+      "count_confidence": 1.0,
+      "proposed": true
+    },
+    {
+      "id": "clothes_rack",
+      "name": "ハンガーラック",
+      "description": "clothes rail or garment rack used to hang clothing, including partly hidden rails",
+      "role": "furniture",
+      "presence": 0.96,
+      "count": "one",
+      "count_confidence": 1.0,
+      "proposed": true
+    },
+    {
+      "id": "tv_stand",
+      "name": "テレビ台",
+      "description": "low television stand or media console",
+      "role": "furniture",
+      "presence": 0.11,
+      "count": "none",
+      "count_confidence": 0.86,
+      "proposed": false
+    },
+    {
+      "id": "sofa",
+      "name": "ソファ・ビーズクッション",
+      "description": "sofa, floor lounge seat or beanbag",
+      "role": "furniture",
+      "presence": 0.02,
+      "count": "none",
+      "count_confidence": 1.0,
+      "proposed": false
+    },
+    {
+      "id": "cabinet",
+      "name": "収納家具",
+      "description": "closed storage cabinet or chest of drawers",
+      "role": "furniture",
+      "presence": 0.08,
+      "count": "none",
+      "count_confidence": 0.86,
+      "proposed": false
+    },
+    {
+      "id": "bed",
+      "name": "ベッド",
+      "description": "bed or sleeping mattress",
+      "role": "furniture",
+      "presence": 0.01,
+      "count": "none",
+      "count_confidence": 1.0,
+      "proposed": false
+    },
+    {
+      "id": "table",
+      "name": "テーブル",
+      "description": "dining table or low occasional table, excluding a work desk",
+      "role": "furniture",
+      "presence": 0.07,
+      "count": "none",
+      "count_confidence": 0.92,
+      "proposed": false
+    },
+    {
+      "id": "clock",
+      "name": "時計",
+      "description": "wall clock or desk clock, including a partly cropped clock",
+      "role": "object",
+      "presence": 0.99,
+      "count": "several",
+      "count_confidence": 1.0,
+      "proposed": true
+    },
+    {
+      "id": "books",
+      "name": "本・雑誌",
+      "description": "group of books or magazines, including books on a lower shelf",
+      "role": "object",
+      "presence": 0.98,
+      "count": "one",
+      "count_confidence": 0.94,
+      "proposed": true
+    },
+    {
+      "id": "oven",
+      "name": "オーブン・電子レンジ",
+      "description": "countertop oven, toaster oven or microwave, including one placed on shelving",
+      "role": "object",
+      "presence": 0.98,
+      "count": "one",
+      "count_confidence": 1.0,
+      "proposed": true
+    },
+    {
+      "id": "tv",
+      "name": "テレビ",
+      "description": "television display",
+      "role": "object",
+      "presence": 0.26,
+      "count": "none",
+      "count_confidence": 0.27,
+      "proposed": false
+    },
+    {
+      "id": "monitor",
+      "name": "パソコンモニター",
+      "description": "computer monitor on a desk",
+      "role": "object",
+      "presence": 0.02,
+      "count": "none",
+      "count_confidence": 0.95,
+      "proposed": false
+    },
+    {
+      "id": "lamp",
+      "name": "照明器具",
+      "description": "ceiling light, desk lamp or floor lamp",
+      "role": "object",
+      "presence": 0.03,
+      "count": "none",
+      "count_confidence": 0.98,
+      "proposed": false
+    },
+    {
+      "id": "plant",
+      "name": "植物",
+      "description": "potted plant",
+      "role": "object",
+      "presence": 0.02,
+      "count": "none",
+      "count_confidence": 1.0,
+      "proposed": false
+    },
+    {
+      "id": "clothes",
+      "name": "衣類・ハンガー",
+      "description": "hanging clothes or clothes hangers",
+      "role": "object",
+      "presence": 0.99,
+      "count": "several",
+      "count_confidence": 0.98,
+      "proposed": true
+    },
+    {
+      "id": "bottle",
+      "name": "瓶・花瓶",
+      "description": "bottle, vase or glass jar",
+      "role": "object",
+      "presence": 0.05,
+      "count": "none",
+      "count_confidence": 0.91,
+      "proposed": false
+    },
+    {
+      "id": "frame",
+      "name": "写真立て・額",
+      "description": "framed picture, framed print or photo frame",
+      "role": "object",
+      "presence": 0.1,
+      "count": "none",
+      "count_confidence": 0.77,
+      "proposed": false
+    },
+    {
+      "id": "ornament",
+      "name": "置物",
+      "description": "decorative figurine, animal ornament or sculpture",
+      "role": "object",
+      "presence": 0.03,
+      "count": "none",
+      "count_confidence": 0.98,
+      "proposed": false
+    },
+    {
+      "id": "bin",
+      "name": "ゴミ箱・バスケット",
+      "description": "waste bin or woven basket",
+      "role": "object",
+      "presence": 0.03,
+      "count": "none",
+      "count_confidence": 0.98,
+      "proposed": false
+    },
+    {
+      "id": "tissue",
+      "name": "ティッシュ箱",
+      "description": "tissue box or tissue dispenser",
+      "role": "object",
+      "presence": 0.05,
+      "count": "none",
+      "count_confidence": 0.88,
+      "proposed": false
+    },
+    {
+      "id": "door",
+      "name": "ドア",
+      "description": "room door",
+      "role": "opening",
+      "presence": 0.02,
+      "count": "none",
+      "count_confidence": 0.98,
+      "proposed": false
+    },
+    {
+      "id": "window",
+      "name": "窓",
+      "description": "window opening",
+      "role": "opening",
+      "presence": 0.03,
+      "count": "none",
+      "count_confidence": 0.95,
+      "proposed": false
+    }
+  ]
+}

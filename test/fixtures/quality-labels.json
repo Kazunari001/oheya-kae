@@ -1,0 +1,74 @@
+{
+  "images": [
+    "quality-room",
+    "quality-empty"
+  ],
+  "labels": [
+    {
+      "id": "shelf",
+      "category": "shelf",
+      "box": [
+        0.1,
+        0.26666666666666666,
+        0.325,
+        0.6333333333333333
+      ],
+      "imageId": "quality-room"
+    },
+    {
+      "id": "books",
+      "category": "books",
+      "box": [
+        0.125,
+        0.7,
+        0.1875,
+        0.15833333333333333
+      ],
+      "imageId": "quality-room"
+    },
+    {
+      "id": "oven",
+      "category": "appliance",
+      "box": [
+        0.15,
+        0.4,
+        0.2125,
+        0.18333333333333332
+      ],
+      "imageId": "quality-room"
+    },
+    {
+      "id": "rack",
+      "category": "clothes_rack",
+      "box": [
+        0.5375,
+        0.3333333333333333,
+        0.3125,
+        0.31666666666666665
+      ],
+      "imageId": "quality-room"
+    },
+    {
+      "id": "clock-left",
+      "category": "clock",
+      "box": [
+        0.55,
+        0.05,
+        0.1,
+        0.13333333333333333
+      ],
+      "imageId": "quality-room"
+    },
+    {
+      "id": "clock-edge",
+      "category": "clock",
+      "box": [
+        0.925,
+        0.05,
+        0.075,
+        0.16666666666666666
+      ],
+      "imageId": "quality-room"
+    }
+  ]
+}

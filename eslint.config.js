@@ -85,7 +85,7 @@ export default [
   },
   {
     // These callbacks run inside Playwright's browser page.
-    files: ['scripts/browser-check.js'],
+    files: ['scripts/browser-check.js', 'scripts/detail-benchmark.js'],
     languageOptions: {
       globals: {
         window: 'readonly',
