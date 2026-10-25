@@ -88,6 +88,21 @@ try {
   assert.ok(!html.includes('href="./viewer.css"'));
   assert.ok(!/<script[^>]+src=/.test(html));
   assert.ok(!html.includes('/*OHEYA_KAE_SCRIPT*/'));
+  const spatial = JSON.parse(await readFile(
+      new URL('../test/fixtures/spatial-room.json', import.meta.url), 'utf8'));
+  const spatialFile = path.join(installDirectory, 'spatial.json');
+  await writeFile(spatialFile, JSON.stringify(spatial));
+  run('layout', 'load', '--input', spatialFile);
+  const state = JSON.parse(run('state')).project;
+  assert.equal(state.objects.length, 5);
+  assert.equal(state.objects[0].parentId, 'shelf');
+  assert.equal(state.furniture[0].supports.length, 3);
+  run('export', '--output', htmlPath);
+  const spatialHTML = await readFile(htmlPath, 'utf8');
+  const payload = JSON.parse(spatialHTML.match(
+      /<script id="oheya-kae-data" type="application\/json">(.*?)<\/script>/s,
+  )[1]);
+  assert.deepEqual(payload.project, state);
 } finally {
   // Delete only the unique temporary child created by this invocation.
   const resolvedDirectory = path.resolve(installDirectory);

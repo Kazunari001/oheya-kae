@@ -1,0 +1,11 @@
+The quality-room.svg, quality-room.png and quality-empty.png fixtures were
+created for this repository on 2026-10-25 and are dedicated to the public domain
+under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).
+
+They are synthetic diagrams, not photographs. They contain no personal room
+images, people, logos or third-party image assets. The gold boxes are derived
+from the authored geometry and manually checked against the rendered PNG.
+
+The fixed evaluation inventory is shelf, book group, oven-like appliance,
+clothes rack and two clocks. Shirt silhouettes are decorative contents of the
+rack and are outside this inventory. Desk and sofa are absence controls.
