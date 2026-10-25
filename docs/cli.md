@@ -162,6 +162,8 @@ node bin/oheya-kae.js export --format json --output output/shared.json
 
 ## 配置案の提案・比較
 
+固定対象・探索順・回転角・希望間隔は[構造化条件](proposal-constraints.md)で指定できます。
+
 ```sh
 node bin/oheya-kae.js layout propose --preference "通路を広く" --count 3 --clearance 600 --step 200
 node bin/oheya-kae.js layout propose --preference "仕事優先" --count 3

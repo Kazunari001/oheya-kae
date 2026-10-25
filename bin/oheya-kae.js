@@ -801,6 +801,7 @@ layout
     });
 layout
     .command('propose')
+    .option('--constraints <path>', 'Fixed/priority/rotation/gap JSON')
     .option('--preference <text>', 'Requested goal', '通路を広く')
     .option('--count <number>', '1–3 proposals', numeric, 3)
     .option('--step <mm>', 'Grid step', numeric, 200)
@@ -811,7 +812,7 @@ layout
         400,
     )
     .action(async (options) =>
-      changed((project) => {
+      changed(async (project) => {
         requireValue(
             Number.isInteger(options.count) &&
             options.count >= 1 &&
@@ -820,7 +821,11 @@ layout
         );
         number(options.step, 'step', 50, 5000);
         number(options.clearance, 'clearance', 0, 5000);
-        const proposals = propose(project, options);
+        const proposals = propose(project, {
+          ...options,
+          constraints: options.constraints
+            ? await readJSON(options.constraints) : {},
+        });
         project.proposals = proposals.map(({validation, ...v}) => v);
         return {proposals, keepProposals: true};
       }),
