@@ -162,7 +162,9 @@ function mergeItem(previous, incoming) {
  * @return {!Object} Imported room or item.
  */
 export function importAnalysis(project, data, images, kind) {
-  const metadata = data.analysis ? normalizeAnalysis(data.analysis) : null;
+  const metadata = normalizeAnalysis(data.analysis ?? {
+    sources: [], regions: [], detections: [],
+  });
   const hashes = new Set(images.map(imageHash));
   for (const source of metadata?.sources ?? []) {
     requireValue(hashes.has(source.sha256), 'Source image hash mismatch');

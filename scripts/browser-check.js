@@ -42,6 +42,12 @@ try {
       'b99069',
   );
   assert.equal(await page.title(), 'oheya-kae — Layout Studio');
+  await page.locator('#revision-details summary').click();
+  assert.match(await page.locator('#revision-info').textContent(),
+      /プロジェクト版: [a-f0-9]{64}/);
+  assert.match(await page.locator('#revision-info').textContent(),
+      /出力元: .*demo.json/);
+  await page.locator('#revision-details summary').click();
   await page
       .getByRole('button', {name: 'ワークデスク', exact: false})
       .click();

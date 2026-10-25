@@ -6,6 +6,7 @@ import {AppError, requireValue} from '../src/errors.js';
 import {normalizeRoom, normalizeFurniture, corrections, confirmed, revise, number, object, KINDS} from '../src/model.js';
 import {importAnalysis, unlinkDetection} from '../src/detections.js';
 import {convertDetectionReport} from '../src/detection-report.js';
+import {revisionHash} from '../src/revisions.js';
 import {load, mutate, readJSON, saveCopy, sameFile} from '../src/store.js';
 import {readImages, analysisSchema, analysisPrompt} from '../src/analysis.js';
 import {validate, applyPlacements} from '../src/validation.js';
@@ -237,6 +238,9 @@ cli
       const project = await load(projectPath());
       result({
         project: project,
+        projectRevision: revisionHash(project),
+        analysisRevision: project.analysis
+          ? revisionHash(project.analysis) : null,
         corrections: corrections(project),
         validation: validate(project),
       });
@@ -864,6 +868,7 @@ layout
 cli
     .command('export')
     .option('--format <format>', 'html|json', 'html')
+    .option('--stage <stage>', 'snapshot|raw|corrected|estimated', 'snapshot')
     .requiredOption('--output <path>')
     .action(async (options) => {
       requireValue(
@@ -878,7 +883,9 @@ cli
       let project;
       if (options.format === 'html') {
         project = await load(projectPath());
-        await exportHTML(project, options.output);
+        await exportHTML(project, options.output, {
+          sourcePath: projectPath(), stage: options.stage,
+        });
       } else {
         project = await saveCopy(projectPath(), options.output);
       }
