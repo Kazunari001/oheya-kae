@@ -9,6 +9,20 @@ const payload = JSON.parse(
 const project = payload.project;
 const room = project.room;
 const getElement = (id) => document.getElementById(id);
+const revision = payload.revision;
+if (revision) {
+  const stages = {snapshot: 'スナップショット', raw: '原回答版',
+    corrected: '補正版', estimated: '仮値補完版'};
+  getElement('revision-info').textContent = [
+    `プロジェクト: ${revision.projectId}`,
+    `出力元: ${revision.sourceProject ?? 'ファイル名なし'}`,
+    `プロジェクト版: ${revision.projectRevision}`,
+    `解析版: ${revision.analysisRevision ?? '解析情報なし'}`,
+    `解析履歴: ${revision.analysisRuns.join(', ') || 'なし'}`,
+    `出力日時: ${revision.exportedAt}`,
+    `版の区分（出力者指定）: ${stages[revision.stage]}`,
+  ].join('\n');
+}
 const formatMillimeters = (v) =>
   v == null ? '不明' : `${Math.round(v).toLocaleString()} mm`;
 const STATUS_NAMES = {

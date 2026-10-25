@@ -4,6 +4,7 @@ import {AppError} from './errors.js';
 import {atomicWrite, withFileLock} from './store.js';
 import {validate, applyPlacements} from './validation.js';
 import {imageHash} from './detections.js';
+import {exportRevision} from './revisions.js';
 
 /**
  * Serialize a JSON-compatible value for an HTML script element.
@@ -20,10 +21,11 @@ export const safeJSON = (value) =>
  * Replace markers only in the original template, never in inserted data.
  * @param {!Object} project Normalized project with lengths in mm.
  * @param {string} output Destination HTML path.
+ * @param {!Object} options Source project path and processing stage.
  * @return {!Promise<string>} Absolute application root directory.
  * @throws {AppError} If the bundle is missing or the destination is locked.
  */
-export async function exportHTML(project, output) {
+export async function exportHTML(project, output, options = {}) {
   const root = new URL('../', import.meta.url);
   let script;
   let license;
@@ -44,6 +46,7 @@ export async function exportHTML(project, output) {
   );
   const styles = await readFile(new URL('viewer/viewer.css', root), 'utf8');
   const payload = {
+    revision: exportRevision(project, options),
     project: project,
     validation: validate(project),
     proposals: project.proposals.map((value) => ({
@@ -79,15 +82,12 @@ export async function exportHTML(project, output) {
         /<\/script/gi,
         '<\\/script',
     ),
-    '</details>':
-      '<pre class="license-text">' +
-      `${escapedLicense}` +
-      '</pre></details>',
+    '<!--OHEYA_KAE_LICENSE-->': escapedLicense,
   };
   // Replace only markers in the original template, never text inside inserted
   // data.
   const placeholders = new RegExp(
-      '/\\*OHEYA_KAE_(?:DATA|SCRIPT)\\*/|</details>|' +
+      '/\\*OHEYA_KAE_(?:DATA|SCRIPT)\\*/|<!--OHEYA_KAE_LICENSE-->|' +
       '<link rel="stylesheet" href="\\./viewer\\.css">',
       'g',
   );

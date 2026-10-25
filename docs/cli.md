@@ -160,6 +160,8 @@ node bin/oheya-kae.js export --format json --output output/shared.json
 
 変更はロックファイルと一時ファイルのrenameで保存します。同じプロジェクトを複数プロセスで同時編集すると`PROJECT_BUSY`を返します。プロセスの異常終了で`.lock.tmp`が残った場合は、編集プロセスが動いていないことを確認して削除してください。
 
+解析・プロジェクト・HTMLの対応は[版の確認](revisions.md)を参照してください。
+
 ## 配置案の提案・比較
 
 固定対象・探索順・回転角・希望間隔は[構造化条件](proposal-constraints.md)で指定できます。

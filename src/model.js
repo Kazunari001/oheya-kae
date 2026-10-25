@@ -544,6 +544,8 @@ export function normalizeProject(raw) {
   const project = {
     version: 2,
     units: 'mm',
+    ...(raw.projectId === undefined ? {} :
+      {projectId: identifier(raw.projectId)}),
     room:
       raw.room == null
         ? null

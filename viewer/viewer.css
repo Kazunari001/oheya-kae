@@ -531,3 +531,7 @@ a:focus-visible {
     display: flex;
   }
 }
+#revision-info {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
