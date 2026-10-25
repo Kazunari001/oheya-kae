@@ -198,8 +198,6 @@ node bin/oheya-kae.js furniture update --id desk-1 --data clear-uncertainties.js
 
 ## 開発・動作確認
 
-通常のpush・PRでは[CI](./docs/ci.md)が3つのOSとNode.js 22・24を検証します。
-
 ```sh
 npm run lint
 npm test
