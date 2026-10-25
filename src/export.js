@@ -82,15 +82,12 @@ export async function exportHTML(project, output, options = {}) {
         /<\/script/gi,
         '<\\/script',
     ),
-    '</details>':
-      '<pre class="license-text">' +
-      `${escapedLicense}` +
-      '</pre></details>',
+    '<!--OHEYA_KAE_LICENSE-->': escapedLicense,
   };
   // Replace only markers in the original template, never text inside inserted
   // data.
   const placeholders = new RegExp(
-      '/\\*OHEYA_KAE_(?:DATA|SCRIPT)\\*/|</details>|' +
+      '/\\*OHEYA_KAE_(?:DATA|SCRIPT)\\*/|<!--OHEYA_KAE_LICENSE-->|' +
       '<link rel="stylesheet" href="\\./viewer\\.css">',
       'g',
   );

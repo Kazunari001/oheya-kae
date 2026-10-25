@@ -43,6 +43,12 @@ test('CLI copies retain identity and HTML records an immutable source revision',
       const before = run(file, 'state');
       run(file, 'export', '--output', htmlFile, '--stage', 'raw');
       const html = await readFile(htmlFile, 'utf8');
+      const revisionDetails = html.match(
+          /<details id="revision-details">(.*?)<\/details>/s,
+      )[1];
+      assert.ok(!revisionDetails.includes('license-text'));
+      assert.ok(!revisionDetails.includes('The above copyright notice'));
+      assert.equal(html.match(/<pre class="license-text">/g)?.length, 1);
       const first = payload(html).revision;
       assert.equal(first.projectId, before.project.projectId);
       assert.equal(first.projectRevision, before.projectRevision);

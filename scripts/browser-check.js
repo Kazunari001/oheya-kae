@@ -47,6 +47,12 @@ try {
       /プロジェクト版: [a-f0-9]{64}/);
   assert.match(await page.locator('#revision-info').textContent(),
       /出力元: .*demo.json/);
+  assert.equal(
+      await page.locator('#revision-details .license-text').count(), 0);
+  assert.equal(await page.locator('.license-text').count(), 1);
+  const licenseText = await page.locator('#license-details .license-text')
+      .textContent();
+  assert.match(licenseText, /The above copyright notice/);
   await page.locator('#revision-details summary').click();
   await page
       .getByRole('button', {name: 'ワークデスク', exact: false})
