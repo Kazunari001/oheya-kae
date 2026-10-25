@@ -19,6 +19,63 @@ function run(project, ...args) {
       {encoding: 'utf8'}));
 }
 
+test('room scaling reports independent objects excluded from calibration',
+    async (t) => {
+      const file = path.join(await workspace(t), 'scope.json');
+      run(file, 'room', 'create', '--width', '4000', '--depth', '5000');
+      run(file, 'furniture', 'add', '--id', 'desk', '--width', '500',
+          '--depth', '500', '--height', '700', '--x', '1000', '--z', '1000');
+      run(file, 'object', 'add', '--id', 'box', '--width', '100',
+          '--depth', '100', '--height', '100', '--x', '3000', '--z', '3000');
+      const result = run(file, 'room', 'scale', '--wall', '0', '--length',
+          '8000', '--include-furniture');
+      assert.equal(result.warnings[0].code, 'UNSCALED_ITEMS');
+      assert.deepEqual(result.warnings[0].objectIds, ['box']);
+      const state = run(file, 'state').project;
+      assert.equal(state.furniture[0].x, 2000);
+      assert.equal(state.objects[0].x, 3000);
+      assert.equal(state.objects[0].width, 100);
+      const roomOnly = run(file, 'room', 'scale', '--wall', '0',
+          '--length', '4000');
+      assert.deepEqual(roomOnly.warnings[0].objectIds, ['desk', 'box']);
+    });
+
+test('room scaling selects hierarchies and wall objects explicitly',
+    async (t) => {
+      const file = path.join(await workspace(t), 'attached.json');
+      run(file, 'layout', 'load', '--input', 'test/fixtures/spatial-room.json');
+      const before = run(file, 'state').project.objects;
+      const result = run(file, 'room', 'scale', '--wall', '0',
+          '--length', '8000');
+      assert.deepEqual(result.warnings[0].objectIds,
+          ['shelf', 'stand', 'desk', ...before.map((item) => item.id)]);
+      assert.deepEqual(run(file, 'state').project.objects, before);
+      const scaled = run(file, 'room', 'scale', '--wall', '0', '--length',
+          '4000', '--include-furniture');
+      assert.deepEqual(scaled.warnings[0].objectIds, ['clock']);
+      const state = run(file, 'state').project;
+      assert.equal(state.objects.find((item) => item.id === 'books').width,
+          250);
+      assert.equal(state.objects.find((item) => item.id === 'books').y, 100);
+      assert.equal(state.furniture[0].supports[0].thickness, 20);
+      assert.equal(state.furniture[0].supports[0].width, 600);
+      const all = run(file, 'room', 'scale', '--wall', '0', '--length',
+          '8000', '--include-furniture', '--include-objects');
+      assert.deepEqual(all.warnings, []);
+      const clock = run(file, 'state').project.objects
+          .find((item) => item.id === 'clock');
+      assert.equal(clock.x, 7960);
+      assert.equal(clock.y, 1500);
+      assert.equal(clock.width, 600);
+      const saved = await readFile(file, 'utf8');
+      const refused = spawnSync(process.execPath,
+          ['bin/oheya-kae.js', '--project', file, 'furniture', 'scale',
+            '--id', 'shelf', '--dimension', 'width', '--length', '1'],
+          {encoding: 'utf8'});
+      assert.equal(refused.status, 1);
+      assert.equal(await readFile(file, 'utf8'), saved);
+    });
+
 test('CLI deletes sole image owners while retaining pending source candidates',
     async (t) => {
       const directory = await workspace(t);
@@ -75,13 +132,14 @@ test('CLI saves objects, follows parents and refuses orphaning or bad imports',
       assert.equal(cup.z, 1900);
       assert.equal(cup.y, 730);
       assert.equal(state.objects.find((item) => item.id === 'cup').x, 100);
+      run(file, 'furniture', 'scale', '--id', 'desk', '--dimension',
+          'width', '--length', '2800');
+      const scaledCup = run(file, 'state').project.objects
+          .find((item) => item.id === 'cup');
+      assert.equal(scaledCup.x, 200);
+      assert.equal(scaledCup.y, 1460);
+      assert.equal(scaledCup.width, 100);
       const before = await readFile(file, 'utf8');
-      const scaled = spawnSync(process.execPath,
-          ['bin/oheya-kae.js', '--project', file, 'furniture', 'scale',
-            '--id', 'desk', '--dimension', 'width', '--length', '1600'],
-          {encoding: 'utf8'});
-      assert.equal(scaled.status, 1);
-      assert.equal(await readFile(file, 'utf8'), before);
       const removed = spawnSync(process.execPath,
           ['bin/oheya-kae.js', '--project', file,
             'furniture', 'remove', '--id', 'desk'], {encoding: 'utf8'});
