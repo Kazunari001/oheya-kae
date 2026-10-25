@@ -345,7 +345,7 @@ test('scaling preserves previous values, notes and nested opening histories',
       const item = cli(file, 'state').project.furniture[0];
       assert.deepEqual(item.evidence.width.history.slice(0, -1), [
         ...scaled.furniture[0].evidence.width.history,
-        {value: 2400, status: 'estimated', note: '部屋の縮尺補正に追従。'},
+        {value: 2400, status: 'estimated', note: '親子関係を保って縮尺補正。'},
       ]);
       assert.equal(item.evidence.width.status, 'confirmed');
       assert.equal(item.evidence.depth.status, 'estimated');

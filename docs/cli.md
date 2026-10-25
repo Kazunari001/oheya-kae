@@ -115,12 +115,22 @@ node bin/oheya-kae.js furniture scale --id desk-1 --dimension width --length 120
 ## JSON契約と検証
 
 `room scale`の対象は部屋の水平寸法です。`--include-furniture`を指定した
-場合も`objects`は対象外です。床置きの小物は寸法・位置が元のまま残るので、
+場合も独立した`objects`は対象外です。床置きの小物は元のまま残るので、
 返却JSONの`warnings`（`code: UNSCALED_ITEMS`と対象外の`objectIds`）を
 確認し、`object update`で別途補正してください。
 オプションなしでは家具と小物のすべてが対象外として通知されます。
-壁掛けや親付き物体も自動変更しません。支持面・親子関係がある場面の
-`--include-furniture`は現在エラーになり、元ファイルを保持します（#24）。
+`--include-furniture`は家具ルートとその子孫（objects内の子も含む）の
+水平寸法・相対座標と棚板のx/z/width/depthを比例変更します。
+高さ・設置高さ・棚板の高さと厚さ・フレーム厚・回転は保持します。
+`--include-objects`を併用すると独立小物と壁掛け、およびその子孫も対象です。
+片方だけの場合、選ばれない親に付く子は対象外として通知します。
+
+`furniture scale`は選択家具の位置・回転を保持し、寸法・フレーム厚、
+棚板の座標・寸法・厚さと全子孫の相対座標・寸法を3方向に比例変更します。
+親子IDと支持面IDは保持します。不明値は不明のままです。
+基準寸法だけconfirmed、他の補正値はestimatedとし全履歴を保持します。
+補正後もモデル制約を満たすか保存前に検証し、失敗時は元ファイルを保持します。
+幾何的な衝突や壁への接触は`layout validate`でも確認してください。
 
 推定値の更新には`--status estimated --note "根拠"`を指定できます。
 検出JSON・再取り込み・更新履歴・画像枠の詳細は[検出データ](detections.md)を参照してください。
